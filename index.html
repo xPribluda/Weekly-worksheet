@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Weekly Worksheet</title>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, onSnapshot }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD6-uAPDdvxhd4RtxGahIcq6BeKlXGhaZk",
+  authDomain: "accountability-worksheet.firebaseapp.com",
+  projectId: "accountability-worksheet",
+  storageBucket: "accountability-worksheet.firebasestorage.app",
+  messagingSenderId: "426223413166",
+  appId: "1:426223413166:web:733842471a33a1f4b90a3f"
+};
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+// ── State ──────────────────────────────────────────────
+const SECTIONS = [
+  { key: "goals",      label: "Goals for the Week", icon: "◎", placeholder: "What do you want to accomplish this week?", multi: true },
+  { key: "wins",       label: "Top 3 Wins",          icon: "✦", placeholder: "Celebrate your victories, big and small.",  multi: true, max: 3 },
+  { key: "challenges", label: "Challenges",           icon: "△", placeholder: "What got in the way?",                     multi: true },
+  { key: "solutions",  label: "Solutions",            icon: "◈", placeholder: "How did you address them?",                multi: true },
+  { key: "learned",    label: "What I've Learned",    icon: "◉", placeholder: "Insights, lessons, reflections...",        multi: false },
+];
+
+const PAST_WEEKS   = 52;
+const FUTURE_WEEKS = 12;
+
+let weekOffset = 0;
+let sheets     = {};
+let currentUid = null;
+let saveTimer  = null;
+let unsubSnap  = null;
+
+// ── Firestore ──────────────────────────────────────────
+function userDocRef(uid) {
+  return doc(db, "users", uid, "data", "sheets");
+}
+
+async function loadFromFirestore(uid) {
+  setStatus("syncing");
+  try {
+    const snap = await getDoc(userDocRef(uid));
+    sheets = snap.exists() ? (snap.data().sheets || {}) : {};
+  } catch(e) { console.error(e); }
+  render();
+  setStatus("saved");
+  if (unsubSnap) unsubSnap();
+  unsubSnap = onSnapshot(userDocRef(uid), snap => {
+    if (snap.exists()) { sheets = snap.data().sheets || {}; render(); }
+  });
+}
+
+function scheduleSave() {
+  setStatus("saving");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveToFirestore, 800);
+}
+
+async function saveToFirestore() {
+  if (!currentUid) return;
+  try { await setDoc(userDocRef(currentUid), { sheets }); setStatus("saved"); }
+  catch(e) { setStatus("error"); console.error(e); }
+}
+
+// ── Auth ───────────────────────────────────────────────
+onAuthStateChanged(auth, user => {
+  if (user) {
+    currentUid = user.uid;
+    showApp(user);
+    loadFromFirestore(user.uid);
+  } else {
+    currentUid = null;
+    if (unsubSnap) { unsubSnap(); unsubSnap = null; }
+    showLogin();
+  }
+});
+
+window.doSignIn = async () => {
+  const email = document.getElementById("emailInput").value.trim();
+  const pass  = document.getElementById("passInput").value;
+  const errEl = document.getElementById("loginError");
+  errEl.textContent = "";
+  if (!email || !pass) { errEl.textContent = "Please enter your email and password."; return; }
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+  } catch(e) {
+    const msgs = {
+      "auth/invalid-credential":   "Incorrect email or password.",
+      "auth/user-not-found":       "No account found with that email.",
+      "auth/wrong-password":       "Incorrect password.",
+      "auth/invalid-email":        "Please enter a valid email address.",
+      "auth/too-many-requests":    "Too many attempts. Please try again later.",
+    };
+    errEl.textContent = msgs[e.code] || "Sign-in failed. Please try again.";
+  }
+};
+
+window.doSignOut = async () => {
+  if (unsubSnap) { unsubSnap(); unsubSnap = null; }
+  await signOut(auth);
+};
+
+// allow pressing Enter in the password field
+window.handleLoginKey = e => { if (e.key === "Enter") window.doSignIn(); };
+
+// ── UI helpers ─────────────────────────────────────────
+function showLogin() {
+  document.getElementById("loginScreen").style.display = "flex";
+  document.getElementById("appShell").style.display    = "none";
+}
+function showApp(user) {
+  document.getElementById("loginScreen").style.display = "none";
+  document.getElementById("appShell").style.display    = "flex";
+  document.getElementById("userEmail").textContent     = user.email;
+}
+function setStatus(state) {
+  const el = document.getElementById("syncStatus");
+  if (!el) return;
+  const map = { syncing:["◌ Syncing…","#7a8090"], saving:["◌ Saving…","#7a8090"], saved:["✓ Synced","#5a8060"], error:["✕ Error","#905050"] };
+  const [text, color] = map[state] || map.saved;
+  el.textContent = text; el.style.color = color;
+}
+
+// ── Date helpers ───────────────────────────────────────
+function getMonday(offset) {
+  const d = new Date(); d.setHours(0,0,0,0);
+  d.setDate(d.getDate() - d.getDay() + 1 + offset * 7);
+  return d;
+}
+function getWeekKey(o)       { return getMonday(o).toISOString().split("T")[0]; }
+function getWeekShortLabel(o){ return getMonday(o).toLocaleDateString("en-US",{month:"short",day:"numeric"}); }
+function getWeekFullLabel(o) {
+  const d = getMonday(o);
+  const s = d.toLocaleDateString("en-US",{month:"short",day:"numeric"});
+  d.setDate(d.getDate()+6);
+  return `${s} – ${d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}`;
+}
+function getWeekYear(o) { return getMonday(o).getFullYear(); }
+
+// ── Sheet helpers ──────────────────────────────────────
+function emptySheet() { return { goals:[""], wins:["","",""], challenges:[""], solutions:[""], learned:"" }; }
+function getSheet(key) { if (!sheets[key]) sheets[key] = emptySheet(); return sheets[key]; }
+function hasData(key) {
+  const s = sheets[key]; if (!s) return false;
+  return s.goals?.some(g=>g.trim())||s.wins?.some(w=>w.trim())||
+         s.challenges?.some(c=>c.trim())||s.solutions?.some(c=>c.trim())||s.learned?.trim();
+}
+
+// ── Navigation ─────────────────────────────────────────
+window.goToCurrentWeek = () => { if (weekOffset!==0) navigate(-weekOffset); };
+window.navigate = delta => {
+  const n = weekOffset + delta;
+  if (n > FUTURE_WEEKS || n < -PAST_WEEKS || delta === 0) return;
+  const sec = document.getElementById("sections");
+  sec.classList.add(delta < 0 ? "slide-out-right" : "slide-out-left");
+  setTimeout(() => {
+    weekOffset = n; render();
+    sec.classList.remove("slide-out-left","slide-out-right");
+    document.getElementById("mainArea").scrollTo({top:0,behavior:"smooth"});
+  }, 140);
+};
+window.jumpTo = offset => { const d=offset-weekOffset; if(d!==0) navigate(d); };
+
+// ── Sidebar ────────────────────────────────────────────
+function renderSidebar() {
+  const scroll = document.getElementById("sidebarScroll");
+  scroll.innerHTML = "";
+  if (FUTURE_WEEKS > 0) {
+    addGroupLabel(scroll,"Upcoming",true);
+    for (let i=FUTURE_WEEKS; i>=1; i--) scroll.appendChild(makeSidebarItem(i));
+    const div=document.createElement("div"); div.className="sidebar-divider"; scroll.appendChild(div);
+  }
+  let lastYear=null;
+  for (let i=0; i>=-PAST_WEEKS; i--) {
+    const yr=getWeekYear(i);
+    if (yr!==lastYear) { addGroupLabel(scroll,yr,false); lastYear=yr; }
+    scroll.appendChild(makeSidebarItem(i));
+  }
+  const active=document.getElementById(`sw-${weekOffset}`);
+  if (active) setTimeout(()=>active.scrollIntoView({block:"nearest",behavior:"smooth"}),60);
+}
+function addGroupLabel(parent,text,isFuture) {
+  const d=document.createElement("div");
+  d.className="sidebar-group-label"+(isFuture?" future":"");
+  d.textContent=text; parent.appendChild(d);
+}
+function makeSidebarItem(i) {
+  const key=getWeekKey(i), isFuture=i>0;
+  const item=document.createElement("div");
+  item.className=["week-item",isFuture?"future-week":"",hasData(key)?"has-data":"",i===weekOffset?"active":""].filter(Boolean).join(" ");
+  item.id=`sw-${i}`; item.onclick=()=>window.jumpTo(i);
+  const dot=document.createElement("div"); dot.className="week-dot";
+  const wrap=document.createElement("div");
+  const lbl=document.createElement("div"); lbl.className="week-item-label"; lbl.textContent=getWeekShortLabel(i);
+  const sub=document.createElement("div"); sub.className="week-item-sub";
+  sub.textContent=i===0?"This week":i>0?`in ${i}w`:`${Math.abs(i)}w ago`;
+  wrap.appendChild(lbl); wrap.appendChild(sub); item.appendChild(dot); item.appendChild(wrap);
+  return item;
+}
+
+// ── Main render ────────────────────────────────────────
+function render() {
+  if (!document.getElementById("weekLabel")) return;
+  const key=getWeekKey(weekOffset), isFuture=weekOffset>0;
+  const sheet=getSheet(key);
+  document.body.classList.toggle("future-mode",isFuture);
+  document.getElementById("weekLabel").textContent=getWeekFullLabel(weekOffset);
+  const badge=document.getElementById("weekBadge");
+  if (weekOffset===0) { badge.className="week-badge current"; badge.textContent="Current Week"; badge.style.display="inline-block"; }
+  else if (isFuture)  { badge.className="week-badge upcoming"; badge.textContent=weekOffset===1?"Next Week":`${weekOffset} Weeks Away`; badge.style.display="inline-block"; }
+  else                { badge.style.display="none"; }
+  const banner=document.getElementById("futureBanner");
+  if (isFuture) { banner.classList.remove("hidden"); document.getElementById("futureBannerText").textContent=`Planning ahead — edits saved for ${getWeekShortLabel(weekOffset)}.`; }
+  else          { banner.classList.add("hidden"); }
+  document.getElementById("nextBtn").disabled=weekOffset>=FUTURE_WEEKS;
+  document.getElementById("prevBtn").disabled=weekOffset<=-PAST_WEEKS;
+  renderSidebar();
+  const container=document.getElementById("sections"); container.innerHTML="";
+  SECTIONS.forEach((sec,si) => {
+    const div=document.createElement("div"); div.className="section";
+    if (si===SECTIONS.length-1) div.style.borderBottom="none";
+    const iconCls=isFuture?"section-icon future":"section-icon";
+    const header=`<div class="section-header"><span class="${iconCls}">${sec.icon}</span><span class="section-title">${sec.label}${sec.max?`<span class="section-cap">(up to ${sec.max})</span>`:""}</span></div>`;
+    if (sec.multi) {
+      const items=sheet[sec.key]||[""];
+      const rows=items.map((val,idx)=>`<div class="input-row"><span class="input-num">${idx+1}.</span><input type="text" value="${esc(val)}" placeholder="${idx===0?esc(sec.placeholder):""}" oninput="window.updateList('${key}','${sec.key}',${idx},this.value)" />${items.length>1?`<button class="remove-btn" onclick="window.removeItem('${key}','${sec.key}',${idx})">×</button>`:""}</div>`).join("");
+      const canAdd=!sec.max||items.length<sec.max;
+      div.innerHTML=header+rows+(canAdd?`<button class="add-btn" onclick="window.addItem('${key}','${sec.key}',${sec.max||0})">+ Add</button>`:"");
+    } else {
+      div.innerHTML=header+`<textarea rows="4" placeholder="${esc(sec.placeholder)}" oninput="window.updateText('${key}','${sec.key}',this.value)">${esc(sheet[sec.key]||"")}</textarea>`;
+    }
+    container.appendChild(div);
+  });
+}
+
+function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+window.updateList = (wk,sk,idx,val) => { getSheet(wk)[sk][idx]=val; scheduleSave(); refreshDot(wk); };
+window.updateText = (wk,sk,val)     => { getSheet(wk)[sk]=val; scheduleSave(); refreshDot(wk); };
+window.addItem    = (wk,sk,max)     => { const s=getSheet(wk); if(max&&s[sk].length>=max)return; s[sk].push(""); scheduleSave(); render(); };
+window.removeItem = (wk,sk,idx)     => { const s=getSheet(wk); s[sk].splice(idx,1); if(!s[sk].length)s[sk]=["?"]; scheduleSave(); render(); };
+function refreshDot(wk) {
+  for (let i=-PAST_WEEKS; i<=FUTURE_WEEKS; i++) {
+    if (getWeekKey(i)===wk) { const item=document.getElementById(`sw-${i}`); if(item)item.classList.toggle("has-data",hasData(wk)); break; }
+  }
+}
+</script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { height:100vh; background:#0e0e0f; font-family:Georgia,'Times New Roman',serif; color:#e8e4dc; overflow:hidden; }
+  .bg-ambient { position:fixed; inset:0; pointer-events:none; z-index:0;
+    background: radial-gradient(ellipse 80% 60% at 20% 10%,rgba(180,140,80,0.07) 0%,transparent 60%),
+                radial-gradient(ellipse 60% 80% at 80% 90%,rgba(100,120,160,0.06) 0%,transparent 60%); }
+
+  /* ── LOGIN ── */
+  #loginScreen { position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; background:#0e0e0f; }
+  .login-box { text-align:center; padding:52px 44px; border:1px solid rgba(255,255,255,0.08); border-radius:4px; max-width:380px; width:90%; background:rgba(255,255,255,0.02); }
+  .login-icon { font-size:28px; color:#c4952a; margin-bottom:18px; }
+  .login-eyebrow { font-size:10px; letter-spacing:0.3em; text-transform:uppercase; color:#5a5248; margin-bottom:8px; }
+  .login-title { font-size:22px; font-weight:400; color:#e8e4dc; letter-spacing:-0.02em; margin-bottom:28px; }
+  .login-field { width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:2px; color:#e8e4dc; padding:11px 14px; font-size:14px; font-family:Georgia,serif; outline:none; margin-bottom:10px; transition:border-color 0.2s; }
+  .login-field:focus { border-color:rgba(196,149,42,0.5); }
+  .login-field::placeholder { color:#4a4540; }
+  .login-btn { width:100%; background:rgba(196,149,42,0.15); border:1px solid rgba(196,149,42,0.4); color:#c4952a; padding:12px; font-size:13px; cursor:pointer; border-radius:2px; font-family:Georgia,serif; transition:all 0.2s; letter-spacing:0.1em; margin-top:4px; }
+  .login-btn:hover { background:rgba(196,149,42,0.25); border-color:#c4952a; }
+  .login-error { margin-top:12px; font-size:12px; color:#c07060; min-height:16px; }
+  .login-note { margin-top:16px; font-size:11px; color:#3a3530; }
+
+  /* ── APP ── */
+  #appShell { display:none; height:100vh; flex-direction:column; }
+  .topbar { height:44px; display:flex; align-items:center; justify-content:flex-end; padding:0 24px; gap:12px; border-bottom:1px solid rgba(255,255,255,0.05); background:rgba(14,14,15,0.9); flex-shrink:0; }
+  #syncStatus { font-size:11px; letter-spacing:0.1em; color:#5a8060; transition:color 0.3s; }
+  .topbar-divider { width:1px; height:16px; background:rgba(255,255,255,0.08); }
+  #userEmail { font-size:12px; color:#5a5248; }
+  .signout-btn { background:none; border:none; color:#4a4540; font-size:11px; cursor:pointer; font-family:Georgia,serif; letter-spacing:0.08em; padding:4px 8px; transition:color 0.2s; }
+  .signout-btn:hover { color:#e8e4dc; }
+
+  .layout { display:flex; flex:1; overflow:hidden; }
+
+  /* ── SIDEBAR ── */
+  .sidebar { position:relative; z-index:2; width:210px; flex-shrink:0; background:rgba(255,255,255,0.02); border-right:1px solid rgba(255,255,255,0.07); display:flex; flex-direction:column; }
+  .sidebar-header { padding:22px 20px 14px; border-bottom:1px solid rgba(255,255,255,0.06); flex-shrink:0; }
+  .sidebar-eyebrow { font-size:9px; letter-spacing:0.3em; text-transform:uppercase; color:#5a5248; margin-bottom:5px; }
+  .sidebar-title { font-size:13px; color:#c4952a; }
+  .sidebar-today-btn { margin:12px 16px 0; background:none; border:1px dashed rgba(196,149,42,0.3); color:#8a7050; padding:7px 12px; font-size:11px; letter-spacing:0.12em; cursor:pointer; border-radius:2px; font-family:Georgia,serif; width:calc(100% - 32px); transition:all 0.2s; text-align:center; flex-shrink:0; }
+  .sidebar-today-btn:hover { border-color:#c4952a; color:#c4952a; }
+  .sidebar-scroll { flex:1; overflow-y:auto; padding:8px 0 24px; }
+  .sidebar-scroll::-webkit-scrollbar { width:3px; }
+  .sidebar-scroll::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:2px; }
+  .sidebar-group-label { font-size:9px; letter-spacing:0.25em; text-transform:uppercase; color:#4a4540; padding:14px 20px 5px; }
+  .sidebar-group-label.future { color:#4a5060; }
+  .sidebar-divider { height:1px; background:rgba(255,255,255,0.06); margin:8px 16px; }
+  .week-item { display:flex; align-items:center; gap:10px; padding:8px 18px 8px 16px; cursor:pointer; transition:background 0.15s; border-left:2px solid transparent; }
+  .week-item:hover { background:rgba(255,255,255,0.04); }
+  .week-item.active { background:rgba(196,149,42,0.08); border-left-color:#c4952a; }
+  .week-item.future-week { opacity:0.65; }
+  .week-item.future-week:hover { opacity:1; background:rgba(100,120,180,0.06); }
+  .week-item.future-week.active { opacity:1; background:rgba(100,120,180,0.1); border-left-color:#6888c0; }
+  .week-item.future-week.has-data { opacity:0.9; }
+  .week-dot { width:5px; height:5px; border-radius:50%; flex-shrink:0; background:#3a3530; transition:background 0.2s; }
+  .week-item.has-data .week-dot { background:#6a5a40; }
+  .week-item.active .week-dot { background:#c4952a; }
+  .week-item.future-week .week-dot { background:#2a3040; }
+  .week-item.future-week.has-data .week-dot { background:#4a5878; }
+  .week-item.future-week.active .week-dot { background:#6888c0; }
+  .week-item-label { font-size:12px; color:#6a6055; line-height:1.3; transition:color 0.15s; }
+  .week-item:hover .week-item-label { color:#a09080; }
+  .week-item.active .week-item-label { color:#e8e4dc; }
+  .week-item.future-week .week-item-label { color:#5a6070; }
+  .week-item.future-week:hover .week-item-label { color:#8090b0; }
+  .week-item.future-week.active .week-item-label { color:#c8d4e8; }
+  .week-item-sub { font-size:10px; color:#4a4540; margin-top:1px; }
+  .week-item.active .week-item-sub { color:#8a7050; }
+  .week-item.future-week .week-item-sub { color:#3a4050; }
+  .week-item.future-week.active .week-item-sub { color:#6878a0; }
+
+  /* ── MAIN ── */
+  .main { flex:1; overflow-y:auto; position:relative; z-index:1; }
+  .main::-webkit-scrollbar { width:4px; }
+  .main::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:2px; }
+  .main-inner { max-width:680px; margin:0 auto; padding:48px 40px 80px; }
+  .future-banner { background:rgba(68,88,160,0.12); border:1px solid rgba(100,130,200,0.15); border-radius:2px; padding:10px 16px; margin-bottom:28px; font-size:12px; color:#7080a8; display:flex; align-items:center; gap:8px; }
+  .future-banner.hidden { display:none; }
+  .week-heading { margin-bottom:12px; display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .week-heading-eyebrow { font-size:10px; letter-spacing:0.3em; text-transform:uppercase; color:#5a5248; margin-bottom:8px; }
+  .week-heading-date { font-size:clamp(20px,3vw,30px); font-weight:400; letter-spacing:-0.02em; color:#e8e4dc; line-height:1.1; }
+  .week-badge { font-size:10px; padding:3px 10px; letter-spacing:0.12em; text-transform:uppercase; border-radius:1px; flex-shrink:0; margin-top:4px; }
+  .week-badge.current  { color:#0e0e0f; background:#c4952a; }
+  .week-badge.upcoming { color:#c8d4e8; background:rgba(68,88,160,0.4); }
+  .week-arrows { display:flex; gap:8px; margin-bottom:40px; margin-top:16px; }
+  .arrow-btn { background:none; border:1px solid rgba(255,255,255,0.08); color:#6a6055; padding:6px 14px; font-size:11px; cursor:pointer; border-radius:2px; font-family:Georgia,serif; transition:all 0.2s; letter-spacing:0.08em; }
+  .arrow-btn:hover:not(:disabled) { border-color:rgba(255,255,255,0.2); color:#e8e4dc; }
+  .arrow-btn:disabled { opacity:0.2; cursor:default; }
+  .section { margin-bottom:36px; padding-bottom:36px; border-bottom:1px solid rgba(255,255,255,0.06); transition:opacity 0.15s,transform 0.15s; }
+  .section:last-child { border-bottom:none; margin-bottom:0; }
+  .section-header { display:flex; align-items:baseline; gap:10px; margin-bottom:16px; }
+  .section-icon { font-size:16px; color:#c4952a; flex-shrink:0; }
+  .section-icon.future { color:#6888c0; }
+  .section-title { font-size:11px; font-weight:400; letter-spacing:0.22em; text-transform:uppercase; color:#7a7060; font-family:Georgia,serif; }
+  .section-cap { margin-left:8px; color:#4a4540; font-size:10px; }
+  .input-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .input-num { color:#4a4540; font-size:11px; min-width:18px; text-align:right; flex-shrink:0; }
+  input[type="text"], textarea { flex:1; width:100%; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:2px; color:#e8e4dc; padding:10px 14px; font-size:14px; font-family:Georgia,serif; outline:none; transition:border-color 0.2s; }
+  input[type="text"]:focus, textarea:focus { border-color:rgba(196,149,42,0.35); }
+  body.future-mode input[type="text"]:focus, body.future-mode textarea:focus { border-color:rgba(100,136,192,0.45); }
+  input[type="text"]::placeholder, textarea::placeholder { color:#3e3a35; }
+  textarea { resize:vertical; line-height:1.75; }
+  .remove-btn { background:none; border:none; color:#3e3a35; cursor:pointer; font-size:16px; padding:0 4px; line-height:1; transition:color 0.2s; flex-shrink:0; }
+  .remove-btn:hover { color:#c4952a; }
+  .add-btn { background:none; border:1px dashed rgba(255,255,255,0.08); color:#5a5248; padding:7px 14px; font-size:11px; letter-spacing:0.1em; cursor:pointer; border-radius:2px; font-family:Georgia,serif; margin-left:26px; transition:all 0.2s; display:inline-block; margin-top:2px; }
+  .add-btn:hover { border-color:rgba(255,255,255,0.2); color:#e8e4dc; }
+  .slide-out-left  { opacity:0 !important; transform:translateX(-16px) !important; }
+  .slide-out-right { opacity:0 !important; transform:translateX(16px) !important; }
+  .footer { margin-top:48px; font-size:10px; color:#3a3530; letter-spacing:0.18em; text-transform:uppercase; }
+
+  @media (max-width:600px) {
+    .sidebar { width:100%; height:180px; border-right:none; border-bottom:1px solid rgba(255,255,255,0.07); flex-direction:row; flex-wrap:wrap; }
+    .sidebar-header { padding:14px 16px 10px; border-bottom:none; border-right:1px solid rgba(255,255,255,0.07); }
+    .sidebar-today-btn { margin:14px 0 0; width:auto; }
+    .sidebar-scroll { flex:1; }
+    .main-inner { padding:24px 20px 60px; }
+  }
+</style>
+</head>
+<body>
+<div class="bg-ambient"></div>
+
+<!-- Login -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-icon">◎</div>
+    <div class="login-eyebrow">Weekly Worksheet</div>
+    <h1 class="login-title">Reflect. Record. Grow.</h1>
+    <input class="login-field" id="emailInput" type="email" placeholder="Email address" onkeydown="window.handleLoginKey(event)" />
+    <input class="login-field" id="passInput"  type="password" placeholder="Password" onkeydown="window.handleLoginKey(event)" />
+    <button class="login-btn" onclick="window.doSignIn()">Sign In</button>
+    <div class="login-error" id="loginError"></div>
+    <div class="login-note">Your data is private and only accessible to you.</div>
+  </div>
+</div>
+
+<!-- App -->
+<div id="appShell">
+  <div class="topbar">
+    <span id="syncStatus">✓ Synced</span>
+    <div class="topbar-divider"></div>
+    <span id="userEmail"></span>
+    <button class="signout-btn" onclick="window.doSignOut()">Sign out</button>
+  </div>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-eyebrow">Weekly Worksheet</div>
+        <div class="sidebar-title">All Weeks</div>
+      </div>
+      <button class="sidebar-today-btn" onclick="window.goToCurrentWeek()">↩ This Week</button>
+      <div class="sidebar-scroll" id="sidebarScroll"></div>
+    </aside>
+    <main class="main" id="mainArea">
+      <div class="main-inner">
+        <div class="future-banner hidden" id="futureBanner">
+          <span>◇</span><span id="futureBannerText"></span>
+        </div>
+        <div class="week-heading">
+          <div>
+            <div class="week-heading-eyebrow">Week of</div>
+            <div class="week-heading-date" id="weekLabel"></div>
+          </div>
+          <div id="weekBadge" style="display:none"></div>
+        </div>
+        <div class="week-arrows">
+          <button class="arrow-btn" id="prevBtn" onclick="window.navigate(-1)">← Earlier</button>
+          <button class="arrow-btn" id="nextBtn" onclick="window.navigate(1)">Later →</button>
+        </div>
+        <div id="sections"></div>
+        <div class="footer">Synced to Firebase · private to you</div>
+      </div>
+    </main>
+  </div>
+</div>
+
+</body>
+</html>
