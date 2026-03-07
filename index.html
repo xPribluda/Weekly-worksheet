@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
 <title>Weekly Worksheet</title>
 
 <script type="module">
@@ -398,7 +398,10 @@ function refreshDot(wk) {
     /* Stack layout vertically on mobile */
     body { overflow: auto; height: auto; }
     #appShell { height: auto; min-height: 100vh; flex-direction: column; }
-    .topbar { position: sticky; top: 0; left: 0; right: 0; z-index: 20; }
+    .topbar { position: sticky; top: 0; left: 0; right: 0; z-index: 20; height: 36px; padding: 0 12px; gap: 8px; }
+    #syncStatus { font-size: 10px; }
+    #userEmail { font-size: 10px; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .signout-btn { font-size: 10px; padding: 2px 6px; }
     .layout { flex-direction: column; overflow: visible; height: auto; }
 
     /* Sidebar becomes a compact horizontal week strip */
@@ -407,44 +410,58 @@ function refreshDot(wk) {
       border-right: none; border-bottom: 1px solid rgba(255,255,255,0.07);
       flex-direction: column;
     }
-    .sidebar-header { padding: 12px 16px 8px; border-bottom: none; }
+    .sidebar-header { padding: 10px 14px 6px; border-bottom: none; }
     .sidebar-eyebrow { display: none; }
-    .sidebar-title { font-size: 12px; }
-    .sidebar-today-btn { margin: 0 16px 10px; width: calc(100% - 32px); padding: 6px 10px; font-size: 10px; }
+    .sidebar-title { font-size: 11px; }
+    .sidebar-today-btn { margin: 0 12px 8px; width: calc(100% - 24px); padding: 5px 8px; font-size: 10px; }
     .sidebar-scroll {
       display: flex; flex-direction: row; overflow-x: auto; overflow-y: hidden;
-      padding: 0 12px 12px; gap: 0;
-      scrollbar-width: none;
+      padding: 0 10px 10px; gap: 0; scrollbar-width: none;
     }
     .sidebar-scroll::-webkit-scrollbar { display: none; }
     .sidebar-group-label { display: none; }
     .sidebar-divider { display: none; }
     .week-item {
-      flex-direction: column; align-items: center; gap: 4px;
-      padding: 8px 10px; min-width: 56px; border-left: none;
+      flex-direction: column; align-items: center; gap: 3px;
+      padding: 6px 8px; min-width: 48px; border-left: none;
       border-bottom: 2px solid transparent; flex-shrink: 0;
     }
     .week-item.active { border-bottom-color: #c4952a; border-left: none; background: rgba(196,149,42,0.08); }
     .week-item.future-week.active { border-bottom-color: #6888c0; }
     .week-item-sub { display: none; }
-    .week-item-label { font-size: 11px; text-align: center; }
+    .week-item-label { font-size: 10px; text-align: center; }
     .week-dot { width: 4px; height: 4px; }
 
     /* Main content full width */
     .main { overflow: visible; }
-    .main-inner { padding: 24px 16px 60px; }
-    .week-heading-date { font-size: 20px; }
-    .week-arrows { gap: 8px; }
-    .arrow-btn { padding: 8px 12px; font-size: 11px; flex: 1; text-align: center; }
+    .main-inner { padding: 18px 14px 48px; }
+    .future-banner { font-size: 11px; padding: 8px 12px; margin-bottom: 16px; }
+    .week-heading { margin-bottom: 8px; }
+    .week-heading-eyebrow { font-size: 9px; margin-bottom: 4px; }
+    .week-heading-date { font-size: 18px; }
+    .week-badge { font-size: 9px; padding: 2px 8px; }
+    .week-arrows { gap: 6px; margin-bottom: 20px; margin-top: 10px; }
+    .arrow-btn { padding: 7px 10px; font-size: 11px; flex: 1; text-align: center; }
 
-    /* Inputs bigger touch targets */
-    input[type="text"], textarea { font-size: 16px; padding: 12px 12px; }
-    .add-btn { margin-left: 0; margin-top: 8px; width: 100%; text-align: center; }
-    .input-num { display: none; }
-    .remove-btn { font-size: 20px; padding: 0 8px; }
+    /* Sections */
+    .section { margin-bottom: 24px; padding-bottom: 24px; }
+    .section-header { margin-bottom: 10px; }
+    .section-icon { font-size: 13px; }
+    .section-title { font-size: 10px; letter-spacing: 0.15em; }
+
+    /* Inputs */
+    input[type="text"], textarea { font-size: 15px; padding: 10px 11px; }
+    .input-row { gap: 6px; margin-bottom: 6px; }
+    .input-num { font-size: 10px; min-width: 14px; }
+    .add-btn { margin-left: 0; margin-top: 6px; width: 100%; text-align: center; font-size: 10px; padding: 6px 10px; }
+    .remove-btn { font-size: 18px; padding: 0 6px; }
+
+    .footer { font-size: 9px; margin-top: 32px; }
 
     /* Login box */
-    .login-box { padding: 40px 24px; }
+    .login-box { padding: 36px 20px; }
+    .login-title { font-size: 20px; }
+    .login-field { font-size: 15px; padding: 10px 12px; }
   }
 </style>
 </head>
