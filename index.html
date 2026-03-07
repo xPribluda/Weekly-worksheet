@@ -37,11 +37,13 @@ const SECTIONS = [
 const PAST_WEEKS   = 52;
 const FUTURE_WEEKS = 12;
 
-let weekOffset = 0;
-let sheets     = {};
-let currentUid = null;
-let saveTimer  = null;
-let unsubSnap  = null;
+let weekOffset  = 0;
+let sheets      = {};
+let currentUid  = null;
+let saveTimer   = null;
+let unsubSnap   = null;
+let isTyping    = false;
+let typingTimer = null;
 
 // ── Firestore ──────────────────────────────────────────
 function userDocRef(uid) {
@@ -58,11 +60,17 @@ async function loadFromFirestore(uid) {
   setStatus("saved");
   if (unsubSnap) unsubSnap();
   unsubSnap = onSnapshot(userDocRef(uid), snap => {
-    if (snap.exists()) { sheets = snap.data().sheets || {}; render(); }
+    if (snap.exists()) {
+      sheets = snap.data().sheets || {};
+      if (!isTyping) render();
+    }
   });
 }
 
 function scheduleSave() {
+  isTyping = true;
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(() => { isTyping = false; }, 2000);
   setStatus("saving");
   clearTimeout(saveTimer);
   saveTimer = setTimeout(saveToFirestore, 800);
