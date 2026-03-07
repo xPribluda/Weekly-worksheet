@@ -42,8 +42,6 @@ let sheets      = {};
 let currentUid  = null;
 let saveTimer   = null;
 let unsubSnap   = null;
-let isTyping    = false;
-let typingTimer = null;
 
 // ── Firestore ──────────────────────────────────────────
 function userDocRef(uid) {
@@ -59,26 +57,41 @@ async function loadFromFirestore(uid) {
   render();
   setStatus("saved");
   if (unsubSnap) unsubSnap();
-  unsubSnap = onSnapshot(userDocRef(uid), snap => {
-    if (snap.exists()) {
+  // Only re-render from remote changes if the update didn't come from us
+  let localSave = false;
+  unsubSnap = onSnapshot(userDocRef(uid), { includeMetadataChanges: true }, snap => {
+    if (!snap.exists()) return;
+    // hasPendingWrites = this is our own local write, skip re-render
+    if (snap.metadata.hasPendingWrites) return;
+    // fromCache = no network update, skip
+    if (snap.metadata.fromCache) return;
+    // This is a genuine remote update from another device
+    const focused = document.activeElement;
+    const inApp   = focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA');
+    if (inApp) {
+      // Just update the data silently, don't touch the DOM
       sheets = snap.data().sheets || {};
-      if (!isTyping) render();
+    } else {
+      sheets = snap.data().sheets || {};
+      render();
     }
+    setStatus("saved");
   });
 }
 
 function scheduleSave() {
-  isTyping = true;
-  clearTimeout(typingTimer);
-  typingTimer = setTimeout(() => { isTyping = false; }, 2000);
   setStatus("saving");
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveToFirestore, 800);
+  // Save after 1s of inactivity, but NEVER call render()
+  saveTimer = setTimeout(saveToFirestore, 1000);
 }
 
 async function saveToFirestore() {
   if (!currentUid) return;
-  try { await setDoc(userDocRef(currentUid), { sheets }); setStatus("saved"); }
+  try {
+    await setDoc(userDocRef(currentUid), { sheets });
+    setStatus("saved");
+  }
   catch(e) { setStatus("error"); console.error(e); }
 }
 
@@ -254,8 +267,16 @@ function render() {
 }
 
 function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
-window.updateList = (wk,sk,idx,val) => { getSheet(wk)[sk][idx]=val; scheduleSave(); refreshDot(wk); };
-window.updateText = (wk,sk,val)     => { getSheet(wk)[sk]=val; scheduleSave(); refreshDot(wk); };
+window.updateList = (wk,sk,idx,val) => {
+  getSheet(wk)[sk][idx] = val;
+  scheduleSave();
+  refreshDot(wk);
+};
+window.updateText = (wk,sk,val) => {
+  getSheet(wk)[sk] = val;
+  scheduleSave();
+  refreshDot(wk);
+};
 window.addItem    = (wk,sk,max)     => { const s=getSheet(wk); if(max&&s[sk].length>=max)return; s[sk].push(""); scheduleSave(); render(); };
 window.removeItem = (wk,sk,idx)     => { const s=getSheet(wk); s[sk].splice(idx,1); if(!s[sk].length)s[sk]=["?"]; scheduleSave(); render(); };
 function refreshDot(wk) {
