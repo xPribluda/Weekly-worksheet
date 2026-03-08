@@ -170,6 +170,7 @@ async function loadReminders(uid) {
   } catch(e) { console.error(e); }
   renderRemindersUI();
   if (reminders.enabled) scheduleNotifications();
+  scheduleOSReminders();
 }
 
 function saveReminders() {
@@ -189,6 +190,29 @@ async function requestNotifPermission() {
   return result === 'granted';
 }
 
+function scheduleOSReminders() {
+  const now = new Date();
+  const nowMs = now.getTime();
+  const todayBase = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const osTimes = [
+    { h: 6,  m: 30, label: "6:30 AM" },
+    { h: 9,  m: 0,  label: "9:00 AM" },
+  ];
+
+  const osMessage = "📋 Review your Weekly Operating System — check your goals, wins, roadblocks, and uncertainties.";
+
+  osTimes.forEach(({ h, m, label }) => {
+    const t = new Date(todayBase.getFullYear(), todayBase.getMonth(), todayBase.getDate(), h, m, 0).getTime();
+    if (t <= nowMs) return; // already passed today
+    const delay = t - nowMs;
+    setTimeout(() => {
+      try { new Notification("Weekly Worksheet · OS Reminder", { body: osMessage }); }
+      catch(e) { console.warn("OS notification failed", e); }
+    }, delay);
+  });
+}
+
 function scheduleNotifications() {
   if (!reminders.enabled) return;
   const sentences = reminders.sentences.filter(s => s.trim());
@@ -200,21 +224,26 @@ function scheduleNotifications() {
   const endMs   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), endH, 0, 0).getTime();
   const nowMs   = now.getTime();
 
-  // Build a shuffled sequence long enough to cover all notifications
-  // If more reminders than sentences, loop through shuffled batches
   function shuffled(arr) {
     const a = [...arr]; for (let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a;
   }
   let pool = [];
   while (pool.length < count) pool = pool.concat(shuffled(sentences));
-  pool = pool.slice(0, count); // exactly `count` sentences, no repeats within a shuffle batch
+  pool = pool.slice(0, count);
 
-  // Schedule evenly spaced times remaining today
   const times = [];
+  const scheduledLabels = [];
   for (let i = 0; i < count; i++) {
     const t = startMs + (i + 1) * (endMs - startMs) / (count + 1);
+    const label = new Date(t).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    scheduledLabels.push(label);
     if (t > nowMs) times.push({ t, text: pool[i] });
   }
+
+  // Store scheduled times for display
+  reminders._scheduledTimes = scheduledLabels;
+  reminders._pendingCount = times.length;
+  renderRemindersUI();
 
   times.forEach(({ t, text }) => {
     const delay = t - nowMs;
@@ -303,12 +332,16 @@ function renderRemindersUI() {
     </div>
     <button class="add-btn" style="margin-left:0;width:100%;text-align:center;margin-top:4px" onclick="window.addReminderSentence()">+ Add sentence</button>
     <button class="add-btn" style="margin-left:0;width:100%;text-align:center;margin-top:8px;border-color:rgba(196,149,42,0.3);color:#8a7050" onclick="window.testNotification()">◎ Send test notification</button>
-    ${on ? `<div class="reminders-status">✓ ${reminders.count} notifications scheduled for today (8am–9pm)</div>` : ''}
+    ${on ? `<div class="reminders-status">
+      ✓ Scheduled today: ${reminders._scheduledTimes ? reminders._scheduledTimes.join(', ') : 'open app to schedule'}<br>
+      ${reminders._pendingCount !== undefined ? `${reminders._pendingCount} still pending` : ''}
+    </div>` : ''}
   `;
 }
 
 // ── Tab switching ──────────────────────────────────────
 window.switchTab = (tab) => {
+  document.getElementById("osTab").style.display         = tab === "os"         ? "" : "none";
   document.getElementById("worksheetTab").style.display  = tab === "worksheet"  ? "" : "none";
   document.getElementById("remindersTab").style.display  = tab === "reminders"  ? "" : "none";
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
@@ -358,19 +391,38 @@ window.jumpTo = offset => { const d=offset-weekOffset; if(d!==0) navigate(d); };
 function renderSidebar() {
   const scroll = document.getElementById("sidebarScroll");
   scroll.innerHTML = "";
-  if (FUTURE_WEEKS > 0) {
-    addGroupLabel(scroll,"Upcoming",true);
-    for (let i=FUTURE_WEEKS; i>=1; i--) scroll.appendChild(makeSidebarItem(i));
-    const div=document.createElement("div"); div.className="sidebar-divider"; scroll.appendChild(div);
+
+  const isMobile = window.innerWidth <= 680;
+
+  if (isMobile) {
+    // Mobile: left=oldest, right=future (chronological order)
+    let lastYear = null;
+    for (let i = -PAST_WEEKS; i <= FUTURE_WEEKS; i++) {
+      // Add a divider between past and future on mobile
+      if (i === 1) {
+        const div = document.createElement("div");
+        div.style.cssText = "width:1px;background:rgba(255,255,255,0.1);margin:4px 4px;flex-shrink:0;align-self:stretch;";
+        scroll.appendChild(div);
+      }
+      scroll.appendChild(makeSidebarItem(i));
+    }
+  } else {
+    // Desktop sidebar: future at top, past below (vertical)
+    if (FUTURE_WEEKS > 0) {
+      addGroupLabel(scroll,"Upcoming",true);
+      for (let i=FUTURE_WEEKS; i>=1; i--) scroll.appendChild(makeSidebarItem(i));
+      const div=document.createElement("div"); div.className="sidebar-divider"; scroll.appendChild(div);
+    }
+    let lastYear=null;
+    for (let i=0; i>=-PAST_WEEKS; i--) {
+      const yr=getWeekYear(i);
+      if (yr!==lastYear) { addGroupLabel(scroll,yr,false); lastYear=yr; }
+      scroll.appendChild(makeSidebarItem(i));
+    }
   }
-  let lastYear=null;
-  for (let i=0; i>=-PAST_WEEKS; i--) {
-    const yr=getWeekYear(i);
-    if (yr!==lastYear) { addGroupLabel(scroll,yr,false); lastYear=yr; }
-    scroll.appendChild(makeSidebarItem(i));
-  }
+
   const active=document.getElementById(`sw-${weekOffset}`);
-  if (active) setTimeout(()=>active.scrollIntoView({block:"nearest",behavior:"smooth"}),60);
+  if (active) setTimeout(()=>active.scrollIntoView({block:"nearest",inline:"center",behavior:"smooth"}),60);
 }
 function addGroupLabel(parent,text,isFuture) {
   const d=document.createElement("div");
@@ -554,7 +606,30 @@ function refreshDot(wk) {
   .slide-out-right { opacity:0 !important; transform:translateX(16px) !important; }
   .footer { margin-top:48px; font-size:10px; color:#3a3530; letter-spacing:0.18em; text-transform:uppercase; }
 
-  /* ── TABS ── */
+  /* ── OPERATING SYSTEM ── */
+  .os-reminder-badge { display:inline-flex; align-items:center; gap:8px; font-size:11px; color:#5a8060; background:rgba(90,128,96,0.1); border:1px solid rgba(90,128,96,0.2); border-radius:2px; padding:7px 14px; margin-bottom:36px; letter-spacing:0.05em; }
+ font-size:10px; letter-spacing:0.3em; text-transform:uppercase; color:#5a5248; margin-bottom:8px; }
+  .os-tagline { font-size:18px; color:#e8e4dc; font-weight:400; letter-spacing:-0.01em; margin-bottom:40px; line-height:1.3; }
+  .os-block { margin-bottom:36px; padding-bottom:36px; border-bottom:1px solid rgba(255,255,255,0.06); }
+  .os-block:last-of-type { border-bottom:none; }
+  .os-block-header { display:flex; align-items:flex-start; gap:14px; margin-bottom:18px; }
+  .os-block-icon { font-size:20px; flex-shrink:0; margin-top:2px; }
+  .os-block-title { font-size:15px; color:#e8e4dc; font-weight:400; letter-spacing:-0.01em; margin-bottom:3px; }
+  .os-block-meta { font-size:11px; color:#c4952a; letter-spacing:0.1em; text-transform:uppercase; }
+  .os-section-label { font-size:11px; letter-spacing:0.15em; text-transform:uppercase; color:#7a7060; margin-bottom:10px; }
+  .os-list { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
+  .os-list li { font-size:14px; color:#b0a898; line-height:1.6; padding-left:16px; position:relative; }
+  .os-list li::before { content:"–"; position:absolute; left:0; color:#5a5248; }
+  .os-dim { color:#5a5248; font-size:12px; }
+  .os-warning { margin-top:16px; font-size:12px; color:#a07050; background:rgba(160,112,80,0.1); border:1px solid rgba(160,112,80,0.2); border-radius:2px; padding:10px 14px; }
+  .os-note { margin-top:14px; font-size:12px; color:#5a5248; font-style:italic; }
+  .os-table-wrap { overflow-x:auto; margin-top:4px; }
+  .os-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .os-table th { text-align:left; font-size:10px; letter-spacing:0.15em; text-transform:uppercase; color:#5a5248; padding:8px 12px; border-bottom:1px solid rgba(255,255,255,0.08); font-weight:400; }
+  .os-table td { padding:10px 12px; color:#b0a898; border-bottom:1px solid rgba(255,255,255,0.04); vertical-align:top; line-height:1.5; }
+  .os-table tr:last-child td { border-bottom:none; }
+  .os-table td:first-child { color:#e8e4dc; white-space:nowrap; }
+  .os-table td:nth-child(3) { color:#5a8060; white-space:nowrap; }
   .tabs { display:flex; gap:0; border-bottom:1px solid rgba(255,255,255,0.07); flex-shrink:0; background:rgba(255,255,255,0.01); }
   .tab-btn { background:none; border:none; color:#5a5248; padding:12px 20px; font-size:11px; letter-spacing:0.15em; text-transform:uppercase; cursor:pointer; font-family:Georgia,serif; border-bottom:2px solid transparent; transition:all 0.2s; }
   .tab-btn:hover { color:#a09080; }
@@ -685,12 +760,140 @@ function refreshDot(wk) {
     <main class="main" id="mainArea">
       <!-- Tabs -->
       <div class="tabs">
-        <button class="tab-btn active" id="tab-worksheet" onclick="window.switchTab('worksheet')">Worksheet</button>
+        <button class="tab-btn active" id="tab-os" onclick="window.switchTab('os')">Operating System</button>
+        <button class="tab-btn" id="tab-worksheet" onclick="window.switchTab('worksheet')">Worksheet</button>
         <button class="tab-btn" id="tab-reminders" onclick="window.switchTab('reminders')">Reminders</button>
       </div>
 
+      <!-- Operating System tab -->
+      <div id="osTab">
+        <div class="main-inner">
+          <div class="os-eyebrow">Weekly Operating System</div>
+          <div class="os-tagline">Your rhythm for momentum, growth, and connection</div>
+          <div class="os-reminder-badge">🔔 Daily reminders scheduled at 6:30 AM &amp; 9:00 AM</div>
+
+          <div class="os-block">
+            <div class="os-block-header">
+              <span class="os-block-icon">🎯</span>
+              <div>
+                <div class="os-block-title">Pitch &amp; Ask and Advance</div>
+                <div class="os-block-meta">Monday · 3:00 PM Eastern</div>
+              </div>
+            </div>
+            <ul class="os-list">
+              <li>Pitch two ask-and-advance opportunities this month</li>
+              <li>Ask if someone would share a win</li>
+              <li>It's an opportunity to share a win every day — even if it's just for you</li>
+            </ul>
+          </div>
+
+          <div class="os-block">
+            <div class="os-block-header">
+              <span class="os-block-icon">🌿</span>
+              <div>
+                <div class="os-block-title">Sunday Evening Reset</div>
+                <div class="os-block-meta">3.5 Hour Block</div>
+              </div>
+            </div>
+            <div class="os-section-label">Review the Week Prior — Ask yourself:</div>
+            <ul class="os-list">
+              <li>What were my wins?</li>
+              <li>What was my momentum?</li>
+            </ul>
+            <div class="os-section-label" style="margin-top:14px">Goal</div>
+            <ul class="os-list">
+              <li>Turn uncertainties → certainties</li>
+              <li>Turn roadblocks → empowerments</li>
+              <li>Carry forward to next week</li>
+            </ul>
+            <div class="os-warning">⚠ If you skip this exercise, you lose energy and momentum.</div>
+          </div>
+
+          <div class="os-block">
+            <div class="os-block-header">
+              <span class="os-block-icon">☀️</span>
+              <div>
+                <div class="os-block-title">Morning Ritual</div>
+                <div class="os-block-meta">Every Day · 30 Seconds</div>
+              </div>
+            </div>
+            <div class="os-section-label">Daily Check-In</div>
+            <ul class="os-list">
+              <li>Remind yourself of your wins and momentum from Sunday</li>
+            </ul>
+            <div class="os-section-label" style="margin-top:14px">Then ask:</div>
+            <ul class="os-list">
+              <li>What are my roadblocks? <span class="os-dim">(mind)</span></li>
+              <li>What are my uncertainties? <span class="os-dim">(heart)</span></li>
+            </ul>
+          </div>
+
+          <div class="os-block">
+            <div class="os-block-header">
+              <span class="os-block-icon">🤝</span>
+              <div>
+                <div class="os-block-title">Networking Calls</div>
+                <div class="os-block-meta">2 Evenings/Week · 2 Hours Each</div>
+              </div>
+            </div>
+            <div class="os-section-label">Weekly Connections</div>
+            <ul class="os-list">
+              <li>Pick 2–5 people to connect with</li>
+              <li>Schedule 15 or 30 min calls — you are the one inviting</li>
+            </ul>
+            <div class="os-section-label" style="margin-top:14px">Call Structure</div>
+            <ul class="os-list">
+              <li>First 15 min: It's about them — get to know them</li>
+              <li>If 30 min: Them first, then you</li>
+            </ul>
+          </div>
+
+          <div class="os-block">
+            <div class="os-block-header">
+              <span class="os-block-icon">✍️</span>
+              <div>
+                <div class="os-block-title">Authority Building</div>
+                <div class="os-block-meta">Ongoing · LinkedIn</div>
+              </div>
+            </div>
+            <div class="os-section-label">Build Your Expert Brand</div>
+            <ul class="os-list">
+              <li>Pick a topic you want to be known for</li>
+              <li>Break it into 3 subtopics</li>
+              <li>Start posting on LinkedIn consistently</li>
+              <li>Don't post and disappear — spend 5 min responding to fellow leapers</li>
+            </ul>
+          </div>
+
+          <div class="os-block">
+            <div class="os-block-header">
+              <span class="os-block-icon">📚</span>
+              <div>
+                <div class="os-block-title">Module Schedule</div>
+                <div class="os-block-meta">One Week Per Module</div>
+              </div>
+            </div>
+            <div class="os-table-wrap">
+              <table class="os-table">
+                <thead>
+                  <tr><th>Week</th><th>Module</th><th>Special</th><th>Focus</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Week 1</td><td>Module 1</td><td>✓ Facilitation Call</td><td>Foundation — go deep, gain clarity</td></tr>
+                  <tr><td>Week 2</td><td>Module 2</td><td>✓ Facilitation Call</td><td>Build on Week 1 — master + add on</td></tr>
+                  <tr><td>Week 3+</td><td>Subsequent</td><td>—</td><td>The deeper you go, the more clarity you gain</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="os-note">The deeper you go into each module, the more clarity you gain.</div>
+          </div>
+
+          <div class="footer">Weekly Operating System</div>
+        </div>
+      </div>
+
       <!-- Worksheet tab -->
-      <div id="worksheetTab">
+      <div id="worksheetTab" style="display:none">
         <div class="main-inner">
           <div class="future-banner hidden" id="futureBanner">
             <span>◇</span><span id="futureBannerText"></span>
