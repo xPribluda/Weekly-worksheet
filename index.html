@@ -262,6 +262,16 @@ window.updateReminderCount = (val) => {
   saveReminders();
 };
 
+window.testNotification = () => {
+  const sentences = reminders.sentences.filter(s => s.trim());
+  const text = sentences.length ? sentences[Math.floor(Math.random() * sentences.length)] : "This is a test reminder!";
+  try {
+    new Notification("Weekly Worksheet", { body: text });
+  } catch(e) {
+    alert("Notification failed: " + e.message);
+  }
+};
+
 function renderRemindersUI() {
   const panel = document.getElementById("remindersPanel");
   if (!panel) return;
@@ -292,6 +302,7 @@ function renderRemindersUI() {
         </div>`).join('')}
     </div>
     <button class="add-btn" style="margin-left:0;width:100%;text-align:center;margin-top:4px" onclick="window.addReminderSentence()">+ Add sentence</button>
+    <button class="add-btn" style="margin-left:0;width:100%;text-align:center;margin-top:8px;border-color:rgba(196,149,42,0.3);color:#8a7050" onclick="window.testNotification()">◎ Send test notification</button>
     ${on ? `<div class="reminders-status">✓ ${reminders.count} notifications scheduled for today (8am–9pm)</div>` : ''}
   `;
 }
