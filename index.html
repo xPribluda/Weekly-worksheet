@@ -168,7 +168,7 @@ async function showNotif(title, body) {
 
 // ── Service Worker registration ─────────────────────────
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW reg failed', e));
+  navigator.serviceWorker.register('/Weekly-worksheet/sw.js').catch(e => console.warn('SW reg failed', e));
 }
 
 // ── Reminders ──────────────────────────────────────────
