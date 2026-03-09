@@ -102,6 +102,7 @@ onAuthStateChanged(auth, user => {
     showApp(user);
     loadFromFirestore(user.uid);
     loadReminders(user.uid);
+    loadJournal(user.uid);
   } else {
     currentUid = null;
     if (unsubSnap) { unsubSnap(); unsubSnap = null; }
@@ -339,14 +340,147 @@ function renderRemindersUI() {
   `;
 }
 
-// ── Tab switching ──────────────────────────────────────
+// ── Journal ────────────────────────────────────────────
+let journal = {}; // { id: { id, title, date, body } }
+let journalCurrentId = null;
+let journalSaveTimer = null;
+
+function journalDocRef(uid) {
+  return doc(db, "users", uid, "data", "journal");
+}
+
+async function loadJournal(uid) {
+  try {
+    const snap = await getDoc(journalDocRef(uid));
+    if (snap.exists()) journal = snap.data().entries || {};
+  } catch(e) { console.error(e); }
+  renderJournal();
+}
+
+function saveJournal() {
+  clearTimeout(journalSaveTimer);
+  journalSaveTimer = setTimeout(async () => {
+    if (!currentUid) return;
+    try { await setDoc(journalDocRef(currentUid), { entries: journal }); } catch(e) { console.error(e); }
+  }, 800);
+}
+
+function newJournalEntry() {
+  const id = Date.now().toString();
+  const now = new Date();
+  journal[id] = {
+    id,
+    title: "",
+    date: now.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric", year:"numeric" }),
+    body: ""
+  };
+  journalCurrentId = id;
+  saveJournal();
+  renderJournal();
+  // Focus the title after render
+  setTimeout(() => {
+    const t = document.getElementById("journalTitle");
+    if (t) t.focus();
+  }, 50);
+}
+
+function deleteJournalEntry(id) {
+  if (!confirm("Delete this entry?")) return;
+  delete journal[id];
+  if (journalCurrentId === id) {
+    const ids = journalSortedIds();
+    journalCurrentId = ids.length ? ids[0] : null;
+  }
+  saveJournal();
+  renderJournal();
+}
+
+function journalSortedIds() {
+  return Object.keys(journal).sort((a,b) => Number(b) - Number(a)); // newest first
+}
+
+function selectJournalEntry(id) {
+  journalCurrentId = id;
+  renderJournalEditor();
+  renderJournalList();
+}
+
+window.newJournalEntry    = newJournalEntry;
+window.selectJournalEntry = selectJournalEntry;
+window.deleteJournalEntry = deleteJournalEntry;
+
+window.updateJournalTitle = (val) => {
+  if (!journalCurrentId || !journal[journalCurrentId]) return;
+  journal[journalCurrentId].title = val;
+  saveJournal();
+  // Update list item title live
+  const el = document.querySelector(`#jlist-${journalCurrentId} .jlist-title`);
+  if (el) el.textContent = val || "Untitled";
+};
+
+window.updateJournalBody = (val) => {
+  if (!journalCurrentId || !journal[journalCurrentId]) return;
+  journal[journalCurrentId].body = val;
+  saveJournal();
+};
+
+function renderJournal() {
+  if (!document.getElementById("journalTab")) return;
+  renderJournalList();
+  renderJournalEditor();
+}
+
+function renderJournalList() {
+  const list = document.getElementById("journalList");
+  if (!list) return;
+  const ids = journalSortedIds();
+  if (!ids.length) {
+    list.innerHTML = `<div class="jlist-empty">No entries yet</div>`;
+    return;
+  }
+  list.innerHTML = ids.map(id => {
+    const e = journal[id];
+    const active = id === journalCurrentId ? " active" : "";
+    return `<div class="jlist-item${active}" id="jlist-${id}" onclick="window.selectJournalEntry('${id}')">
+      <div class="jlist-title">${esc(e.title || "Untitled")}</div>
+      <div class="jlist-date">${esc(e.date)}</div>
+    </div>`;
+  }).join("");
+}
+
+function renderJournalEditor() {
+  const editor = document.getElementById("journalEditor");
+  if (!editor) return;
+  if (!journalCurrentId || !journal[journalCurrentId]) {
+    editor.innerHTML = `<div class="journal-empty-state">◎<br><br>Select an entry or create a new one</div>`;
+    return;
+  }
+  const e = journal[journalCurrentId];
+  editor.innerHTML = `
+    <div class="journal-editor-inner">
+      <div class="journal-date-label">${esc(e.date)}</div>
+      <input id="journalTitle" class="journal-title-input" type="text"
+        value="${esc(e.title)}" placeholder="Entry title…"
+        oninput="window.updateJournalTitle(this.value)" />
+      <textarea id="journalBody" class="journal-body-input"
+        placeholder="Write freely…"
+        oninput="window.updateJournalBody(this.value)">${esc(e.body)}</textarea>
+      <button class="journal-delete-btn" onclick="window.deleteJournalEntry('${journalCurrentId}')">Delete entry</button>
+    </div>
+  `;
+  // restore scroll position
+  const ta = document.getElementById("journalBody");
+  if (ta) ta.style.minHeight = "400px";
+}
 window.switchTab = (tab) => {
   document.getElementById("osTab").style.display         = tab === "os"         ? "" : "none";
   document.getElementById("worksheetTab").style.display  = tab === "worksheet"  ? "" : "none";
+  document.getElementById("journalTab").style.display    = tab === "journal"    ? "" : "none";
   document.getElementById("remindersTab").style.display  = tab === "reminders"  ? "" : "none";
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
   document.getElementById(`tab-${tab}`).classList.add("active");
   if (tab === "reminders") renderRemindersUI();
+  if (tab === "journal")   renderJournal();
 };
 function getMonday(offset) {
   const d = new Date(); d.setHours(0,0,0,0);
@@ -608,7 +742,7 @@ function refreshDot(wk) {
 
   /* ── OPERATING SYSTEM ── */
   .os-reminder-badge { display:inline-flex; align-items:center; gap:8px; font-size:11px; color:#5a8060; background:rgba(90,128,96,0.1); border:1px solid rgba(90,128,96,0.2); border-radius:2px; padding:7px 14px; margin-bottom:36px; letter-spacing:0.05em; }
- font-size:10px; letter-spacing:0.3em; text-transform:uppercase; color:#5a5248; margin-bottom:8px; }
+  .os-eyebrow { font-size:10px; letter-spacing:0.3em; text-transform:uppercase; color:#5a5248; margin-bottom:8px; }
   .os-tagline { font-size:18px; color:#e8e4dc; font-weight:400; letter-spacing:-0.01em; margin-bottom:40px; line-height:1.3; }
   .os-block { margin-bottom:36px; padding-bottom:36px; border-bottom:1px solid rgba(255,255,255,0.06); }
   .os-block:last-of-type { border-bottom:none; }
@@ -634,6 +768,36 @@ function refreshDot(wk) {
   .tab-btn { background:none; border:none; color:#5a5248; padding:12px 20px; font-size:11px; letter-spacing:0.15em; text-transform:uppercase; cursor:pointer; font-family:Georgia,serif; border-bottom:2px solid transparent; transition:all 0.2s; }
   .tab-btn:hover { color:#a09080; }
   .tab-btn.active { color:#c4952a; border-bottom-color:#c4952a; }
+
+  /* ── JOURNAL ── */
+  .journal-layout { display:flex; height:calc(100vh - 88px); overflow:hidden; }
+  .journal-sidebar { width:200px; flex-shrink:0; border-right:1px solid rgba(255,255,255,0.07); display:flex; flex-direction:column; overflow:hidden; }
+  .journal-new-btn { margin:14px 14px 10px; background:none; border:1px dashed rgba(196,149,42,0.3); color:#8a7050; padding:8px 12px; font-size:11px; letter-spacing:0.12em; cursor:pointer; border-radius:2px; font-family:Georgia,serif; transition:all 0.2s; text-align:center; flex-shrink:0; }
+  .journal-new-btn:hover { border-color:#c4952a; color:#c4952a; }
+  .journal-list { flex:1; overflow-y:auto; padding:4px 0 24px; }
+  .journal-list::-webkit-scrollbar { width:3px; }
+  .journal-list::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:2px; }
+  .jlist-item { padding:10px 14px; cursor:pointer; border-left:2px solid transparent; transition:background 0.15s; }
+  .jlist-item:hover { background:rgba(255,255,255,0.04); }
+  .jlist-item.active { background:rgba(196,149,42,0.08); border-left-color:#c4952a; }
+  .jlist-title { font-size:12px; color:#a09080; line-height:1.3; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .jlist-item.active .jlist-title { color:#e8e4dc; }
+  .jlist-date { font-size:10px; color:#4a4540; }
+  .jlist-item.active .jlist-date { color:#6a5a40; }
+  .jlist-empty { padding:20px 14px; font-size:12px; color:#4a4540; }
+  .journal-editor { flex:1; overflow-y:auto; }
+  .journal-editor::-webkit-scrollbar { width:4px; }
+  .journal-editor::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:2px; }
+  .journal-empty-state { text-align:center; color:#3a3530; font-size:22px; padding-top:80px; line-height:2; }
+  .journal-editor-inner { max-width:640px; margin:0 auto; padding:40px 40px 80px; }
+  .journal-date-label { font-size:10px; letter-spacing:0.2em; text-transform:uppercase; color:#5a5248; margin-bottom:16px; }
+  .journal-title-input { width:100%; background:none; border:none; border-bottom:1px solid rgba(255,255,255,0.08); color:#e8e4dc; padding:8px 0; font-size:22px; font-family:Georgia,serif; outline:none; margin-bottom:24px; letter-spacing:-0.01em; transition:border-color 0.2s; }
+  .journal-title-input:focus { border-bottom-color:rgba(196,149,42,0.4); }
+  .journal-title-input::placeholder { color:#3a3530; }
+  .journal-body-input { width:100%; background:none; border:none; color:#b0a898; padding:0; font-size:15px; font-family:Georgia,serif; outline:none; resize:none; line-height:1.85; min-height:400px; }
+  .journal-body-input::placeholder { color:#3a3530; }
+  .journal-delete-btn { margin-top:40px; background:none; border:1px solid rgba(255,255,255,0.06); color:#4a4540; padding:6px 14px; font-size:11px; cursor:pointer; border-radius:2px; font-family:Georgia,serif; transition:all 0.2s; letter-spacing:0.08em; }
+  .journal-delete-btn:hover { border-color:rgba(200,80,80,0.4); color:#c07070; }
 
   /* ── REMINDERS ── */
   .reminders-panel { padding: 40px; max-width: 680px; margin: 0 auto; }
@@ -714,6 +878,14 @@ function refreshDot(wk) {
     .add-btn { margin-left: 0; margin-top: 6px; width: 100%; text-align: center; font-size: 10px; padding: 6px 10px; }
     .remove-btn { font-size: 18px; padding: 0 6px; }
 
+    /* Journal mobile */
+    .journal-layout { flex-direction:column; height:auto; }
+    .journal-sidebar { width:100%; border-right:none; border-bottom:1px solid rgba(255,255,255,0.07); }
+    .journal-list { max-height:180px; }
+    .journal-editor-inner { padding:20px 14px 60px; }
+    .journal-title-input { font-size:18px; }
+    .journal-body-input { font-size:14px; min-height:300px; }
+
     .footer { font-size: 9px; margin-top: 32px; }
 
     /* Login box */
@@ -762,6 +934,7 @@ function refreshDot(wk) {
       <div class="tabs">
         <button class="tab-btn active" id="tab-os" onclick="window.switchTab('os')">Operating System</button>
         <button class="tab-btn" id="tab-worksheet" onclick="window.switchTab('worksheet')">Worksheet</button>
+        <button class="tab-btn" id="tab-journal" onclick="window.switchTab('journal')">Journal</button>
         <button class="tab-btn" id="tab-reminders" onclick="window.switchTab('reminders')">Reminders</button>
       </div>
 
@@ -911,6 +1084,19 @@ function refreshDot(wk) {
           </div>
           <div id="sections"></div>
           <div class="footer">Synced to Firebase · private to you</div>
+        </div>
+      </div>
+
+      <!-- Journal tab -->
+      <div id="journalTab" style="display:none">
+        <div class="journal-layout">
+          <div class="journal-sidebar">
+            <button class="journal-new-btn" onclick="window.newJournalEntry()">+ New Entry</button>
+            <div class="journal-list" id="journalList"></div>
+          </div>
+          <div class="journal-editor" id="journalEditor">
+            <div class="journal-empty-state">◎<br><br>Select an entry or create a new one</div>
+          </div>
         </div>
       </div>
 
