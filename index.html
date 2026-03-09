@@ -529,10 +529,8 @@ function renderSidebar() {
   const isMobile = window.innerWidth <= 680;
 
   if (isMobile) {
-    // Mobile: left=oldest, right=future (chronological order)
-    let lastYear = null;
+    // Mobile: left=oldest, right=future (chronological)
     for (let i = -PAST_WEEKS; i <= FUTURE_WEEKS; i++) {
-      // Add a divider between past and future on mobile
       if (i === 1) {
         const div = document.createElement("div");
         div.style.cssText = "width:1px;background:rgba(255,255,255,0.1);margin:4px 4px;flex-shrink:0;align-self:stretch;";
@@ -541,22 +539,22 @@ function renderSidebar() {
       scroll.appendChild(makeSidebarItem(i));
     }
   } else {
-    // Desktop sidebar: future at top, past below (vertical)
-    if (FUTURE_WEEKS > 0) {
-      addGroupLabel(scroll,"Upcoming",true);
-      for (let i=FUTURE_WEEKS; i>=1; i--) scroll.appendChild(makeSidebarItem(i));
-      const div=document.createElement("div"); div.className="sidebar-divider"; scroll.appendChild(div);
-    }
-    let lastYear=null;
-    for (let i=0; i>=-PAST_WEEKS; i--) {
-      const yr=getWeekYear(i);
-      if (yr!==lastYear) { addGroupLabel(scroll,yr,false); lastYear=yr; }
+    // Desktop: oldest at top, current week in middle, future at bottom
+    let lastYear = null;
+    for (let i = -PAST_WEEKS; i <= 0; i++) {
+      const yr = getWeekYear(i);
+      if (yr !== lastYear) { addGroupLabel(scroll, yr, false); lastYear = yr; }
       scroll.appendChild(makeSidebarItem(i));
+    }
+    if (FUTURE_WEEKS > 0) {
+      const div = document.createElement("div"); div.className = "sidebar-divider"; scroll.appendChild(div);
+      addGroupLabel(scroll, "Upcoming", true);
+      for (let i = 1; i <= FUTURE_WEEKS; i++) scroll.appendChild(makeSidebarItem(i));
     }
   }
 
-  const active=document.getElementById(`sw-${weekOffset}`);
-  if (active) setTimeout(()=>active.scrollIntoView({block:"nearest",inline:"center",behavior:"smooth"}),60);
+  const active = document.getElementById(`sw-${weekOffset}`);
+  if (active) setTimeout(() => active.scrollIntoView({ block:"nearest", inline:"center", behavior:"smooth" }), 60);
 }
 function addGroupLabel(parent,text,isFuture) {
   const d=document.createElement("div");
