@@ -48,6 +48,39 @@ function userDocRef(uid) {
   return doc(db, "users", uid, "data", "sheets");
 }
 
+// ── One-time data migration ────────────────────────────
+const OLD_UID = "T1ZzUT3rt8ha2iquCt5w45kUg4J3";
+
+window.migrateData = async () => {
+  if (!currentUid) { alert("Please sign in first."); return; }
+  try {
+    const btn = document.getElementById("migrateBtn");
+    if (btn) btn.textContent = "Migrating…";
+
+    // Copy sheets
+    const sheetsSnap = await getDoc(doc(db, "users", OLD_UID, "data", "sheets"));
+    if (sheetsSnap.exists()) {
+      await setDoc(doc(db, "users", currentUid, "data", "sheets"), sheetsSnap.data());
+    }
+    // Copy reminders
+    const remSnap = await getDoc(doc(db, "users", OLD_UID, "data", "reminders"));
+    if (remSnap.exists()) {
+      await setDoc(doc(db, "users", currentUid, "data", "reminders"), remSnap.data());
+    }
+    // Copy journal
+    const jSnap = await getDoc(doc(db, "users", OLD_UID, "data", "journal"));
+    if (jSnap.exists()) {
+      await setDoc(doc(db, "users", currentUid, "data", "journal"), jSnap.data());
+    }
+
+    alert("✓ Migration complete! Reloading now…");
+    window.location.reload();
+  } catch(e) {
+    alert("Migration failed: " + e.message);
+    console.error(e);
+  }
+};
+
 async function loadFromFirestore(uid) {
   setStatus("syncing");
   try {
@@ -932,6 +965,8 @@ function refreshDot(wk) {
 <div id="appShell">
   <div class="topbar">
     <span id="syncStatus">✓ Synced</span>
+    <div class="topbar-divider"></div>
+    <button id="migrateBtn" onclick="window.migrateData()" style="background:rgba(196,149,42,0.15);border:1px solid rgba(196,149,42,0.4);color:#c4952a;padding:3px 10px;font-size:10px;cursor:pointer;border-radius:2px;font-family:Georgia,serif;letter-spacing:0.08em;">↺ Restore my data</button>
     <div class="topbar-divider"></div>
     <span id="userEmail"></span>
     <button class="signout-btn" onclick="window.doSignOut()">Sign out</button>
