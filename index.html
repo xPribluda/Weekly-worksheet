@@ -307,6 +307,8 @@ window.requestPermissionManually = async () => {
   }
   renderRemindersUI();
 };
+
+window.testNotification = () => {
   const sentences = reminders.sentences.filter(s => s.trim());
   const text = sentences.length ? sentences[Math.floor(Math.random() * sentences.length)] : "This is a test reminder!";
   try {
@@ -346,8 +348,8 @@ function renderRemindersUI() {
         </div>`).join('')}
     </div>
     <button class="add-btn" style="margin-left:0;width:100%;text-align:center;margin-top:4px" onclick="window.addReminderSentence()">+ Add sentence</button>
-    ${'Notification' in window && Notification.permission !== 'granted' ? `
-    <button class="add-btn" style="margin-left:0;width:100%;text-align:center;margin-top:8px;border-color:rgba(100,136,192,0.3);color:#6080a8" onclick="window.requestPermissionManually()">🔔 Allow notifications</button>` : ''}
+    ${(typeof Notification !== "undefined" && Notification.permission !== "granted") ? `
+    <button class="add-btn" style="margin-left:0;width:100%;text-align:center;margin-top:8px;border-color:rgba(100,136,192,0.3);color:#6080a8" onclick="window.requestPermissionManually()">🔔 Allow notifications</button>` : ""}
     <button class="add-btn" style="margin-left:0;width:100%;text-align:center;margin-top:8px;border-color:rgba(196,149,42,0.3);color:#8a7050" onclick="window.testNotification()">◎ Send test notification</button>
     ${on ? `<div class="reminders-status">
       ✓ Scheduled today: ${reminders._scheduledTimes ? reminders._scheduledTimes.join(', ') : 'open app to schedule'}<br>
