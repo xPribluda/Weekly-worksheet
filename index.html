@@ -156,6 +156,21 @@ function setStatus(state) {
   el.textContent = text; el.style.color = color;
 }
 
+// ── Cross-platform notification helper ─────────────────
+async function showNotif(title, body) {
+  if ('serviceWorker' in navigator) {
+    const reg = await navigator.serviceWorker.ready;
+    await reg.showNotification(title, { body });
+  } else {
+    new Notification(title, { body });
+  }
+}
+
+// ── Service Worker registration ─────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(e => console.warn('SW reg failed', e));
+}
+
 // ── Reminders ──────────────────────────────────────────
 let reminders = { sentences: [""], count: 4, enabled: false };
 let notifSaveTimer = null;
@@ -208,7 +223,7 @@ function scheduleOSReminders() {
     if (t <= nowMs) return; // already passed today
     const delay = t - nowMs;
     setTimeout(() => {
-      try { new Notification("Weekly Worksheet · OS Reminder", { body: osMessage }); }
+      try { await showNotif("Weekly Worksheet · OS Reminder", osMessage); }
       catch(e) { console.warn("OS notification failed", e); }
     }, delay);
   });
@@ -250,7 +265,7 @@ function scheduleNotifications() {
     const delay = t - nowMs;
     setTimeout(() => {
       if (!reminders.enabled) return;
-      try { new Notification("Weekly Worksheet", { body: text, icon: "" }); }
+      try { await showNotif("Weekly Worksheet", text); }
       catch(e) { console.warn("Notification failed", e); }
     }, delay);
   });
@@ -308,11 +323,11 @@ window.requestPermissionManually = async () => {
   renderRemindersUI();
 };
 
-window.testNotification = () => {
+window.testNotification = async () => {
   const sentences = reminders.sentences.filter(s => s.trim());
   const text = sentences.length ? sentences[Math.floor(Math.random() * sentences.length)] : "This is a test reminder!";
   try {
-    new Notification("Weekly Worksheet", { body: text });
+    await showNotif("Weekly Worksheet", text);
   } catch(e) {
     alert("Notification failed: " + e.message);
   }
