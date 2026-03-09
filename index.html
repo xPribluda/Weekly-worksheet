@@ -222,7 +222,7 @@ function scheduleOSReminders() {
     const t = new Date(todayBase.getFullYear(), todayBase.getMonth(), todayBase.getDate(), h, m, 0).getTime();
     if (t <= nowMs) return; // already passed today
     const delay = t - nowMs;
-    setTimeout(() => {
+    setTimeout(async () => {
       try { await showNotif("Weekly Worksheet · OS Reminder", osMessage); }
       catch(e) { console.warn("OS notification failed", e); }
     }, delay);
@@ -263,7 +263,7 @@ function scheduleNotifications() {
 
   times.forEach(({ t, text }) => {
     const delay = t - nowMs;
-    setTimeout(() => {
+    setTimeout(async () => {
       if (!reminders.enabled) return;
       try { await showNotif("Weekly Worksheet", text); }
       catch(e) { console.warn("Notification failed", e); }
