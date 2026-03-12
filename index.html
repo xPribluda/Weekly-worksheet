@@ -149,6 +149,16 @@ function showApp(user) {
   document.getElementById("appShell").style.display    = "flex";
   document.getElementById("userEmail").textContent     = user.email;
 }
+
+function showAffirmationBanner() {
+  const sentences = (reminders.sentences || []).filter(s => s.trim());
+  const el = document.getElementById("affirmationBanner");
+  if (!el) return;
+  if (!sentences.length) { el.style.display = "none"; return; }
+  const text = sentences[Math.floor(Math.random() * sentences.length)];
+  el.textContent = "✦ " + text;
+  el.style.display = "block";
+}
 function setStatus(state) {
   const el = document.getElementById("syncStatus");
   if (!el) return;
@@ -185,6 +195,7 @@ async function loadReminders(uid) {
   renderRemindersUI();
   if (reminders.enabled) scheduleNotifications();
   scheduleOSReminders();
+  showAffirmationBanner();
 }
 
 function saveReminders() {
@@ -768,6 +779,8 @@ function refreshDot(wk) {
   .signout-btn { background:none; border:none; color:#4a4540; font-size:11px; cursor:pointer; font-family:Georgia,serif; letter-spacing:0.08em; padding:4px 8px; transition:color 0.2s; }
   .signout-btn:hover { color:#e8e4dc; }
 
+  #affirmationBanner { background:rgba(196,149,42,0.08); border-bottom:1px solid rgba(196,149,42,0.15); color:#c4952a; font-size:13px; font-family:Georgia,serif; padding:10px 24px; text-align:center; letter-spacing:0.04em; line-height:1.5; font-style:italic; flex-shrink:0; }
+
   .layout { display:flex; flex:1; overflow:hidden; }
 
   /* ── SIDEBAR ── */
@@ -1044,6 +1057,7 @@ function refreshDot(wk) {
     <span id="userEmail"></span>
     <button class="signout-btn" onclick="window.doSignOut()">Sign out</button>
   </div>
+  <div id="affirmationBanner" style="display:none"></div>
   <div class="layout">
     <aside class="sidebar">
       <div class="sidebar-header">
