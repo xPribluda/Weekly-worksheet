@@ -466,6 +466,25 @@ window.updateJournalBody = (val) => {
   saveJournal();
 };
 
+window.jfmt = (cmd) => {
+  document.execCommand(cmd, false, null);
+  document.getElementById("journalBody")?.focus();
+};
+
+window.jfmtBlock = (tag) => {
+  document.execCommand('formatBlock', false, tag);
+  document.getElementById("journalBody")?.focus();
+};
+
+window.jHighlight = () => {
+  const colors = ['#c4952a33', '#5a806033', '#6888c033', 'transparent'];
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  // cycle through highlight colors
+  document.execCommand('hiliteColor', false, '#c4952a33');
+  document.getElementById("journalBody")?.focus();
+};
+
 window.updateJournalLinkTitle = (val) => {
   if (!journalCurrentId || !journal[journalCurrentId]) return;
   journal[journalCurrentId].linkTitle = val;
@@ -520,9 +539,23 @@ function renderJournalEditor() {
       <input id="journalTitle" class="journal-title-input" type="text"
         value="${esc(e.title)}" placeholder="Entry title…"
         oninput="window.updateJournalTitle(this.value)" />
-      <textarea id="journalBody" class="journal-body-input"
-        placeholder="Write freely…"
-        oninput="window.updateJournalBody(this.value)">${esc(e.body)}</textarea>
+      <div class="journal-toolbar">
+        <button class="jtool-btn" onclick="window.jfmt('bold')" title="Bold"><b>B</b></button>
+        <button class="jtool-btn" onclick="window.jfmt('italic')" title="Italic"><i>I</i></button>
+        <button class="jtool-btn" onclick="window.jfmt('underline')" title="Underline"><u>U</u></button>
+        <div class="jtool-divider"></div>
+        <button class="jtool-btn" onclick="window.jfmt('insertUnorderedList')" title="Bullet list">≡</button>
+        <button class="jtool-btn" onclick="window.jfmt('insertOrderedList')" title="Numbered list">1.</button>
+        <div class="jtool-divider"></div>
+        <button class="jtool-btn" onclick="window.jfmtBlock('h2')" title="Heading">H</button>
+        <button class="jtool-btn" onclick="window.jfmtBlock('blockquote')" title="Quote">"</button>
+        <div class="jtool-divider"></div>
+        <button class="jtool-btn jtool-highlight" onclick="window.jHighlight()" title="Highlight">▲</button>
+        <button class="jtool-btn" onclick="window.jfmt('removeFormat')" title="Clear formatting">✕</button>
+      </div>
+      <div id="journalBody" class="journal-body-rich" contenteditable="true"
+        data-placeholder="Write freely…"
+        oninput="window.updateJournalBody(this.innerHTML)">${e.body || ''}</div>
       <div class="journal-link-row">
         <div class="journal-link-fields">
           <input class="link-title-input" type="text" value="${esc(e.linkTitle||'')}" placeholder="Link title (optional)…"
@@ -535,8 +568,6 @@ function renderJournalEditor() {
       <button class="journal-delete-btn" onclick="window.deleteJournalEntry('${journalCurrentId}')">Delete entry</button>
     </div>
   `;
-  const ta = document.getElementById("journalBody");
-  if (ta) ta.style.minHeight = "400px";
 }
 window.switchTab = (tab) => {
   document.getElementById("osTab").style.display         = tab === "os"         ? "" : "none";
@@ -957,6 +988,21 @@ function refreshDot(wk) {
   .journal-title-input::placeholder { color:#3a3530; }
   .journal-body-input { width:100%; background:none; border:none; color:#b0a898; padding:0; font-size:15px; font-family:Georgia,serif; outline:none; resize:none; line-height:1.85; min-height:400px; }
   .journal-body-input::placeholder { color:#3a3530; }
+  .journal-body-rich { min-height:400px; color:#b0a898; font-size:15px; font-family:Georgia,serif; line-height:1.85; outline:none; padding:4px 0; }
+  .journal-body-rich:empty:before { content:attr(data-placeholder); color:#3a3530; pointer-events:none; }
+  .journal-body-rich b, .journal-body-rich strong { color:#e8e4dc; }
+  .journal-body-rich i, .journal-body-rich em { color:#c8b898; }
+  .journal-body-rich u { text-decoration-color:rgba(196,149,42,0.5); }
+  .journal-body-rich h2 { font-size:18px; color:#e8e4dc; font-weight:400; letter-spacing:-0.01em; margin:16px 0 8px; }
+  .journal-body-rich blockquote { border-left:2px solid rgba(196,149,42,0.4); margin:8px 0; padding:4px 16px; color:#8a7a68; font-style:italic; }
+  .journal-body-rich ul { padding-left:20px; margin:8px 0; }
+  .journal-body-rich ol { padding-left:20px; margin:8px 0; }
+  .journal-body-rich li { margin-bottom:4px; }
+  .journal-toolbar { display:flex; align-items:center; gap:2px; padding:8px 0; margin-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.06); flex-wrap:wrap; }
+  .jtool-btn { background:none; border:none; color:#6a6055; padding:5px 9px; font-size:13px; cursor:pointer; border-radius:2px; font-family:Georgia,serif; transition:all 0.15s; line-height:1; }
+  .jtool-btn:hover { background:rgba(255,255,255,0.06); color:#e8e4dc; }
+  .jtool-highlight { color:#c4952a; }
+  .jtool-divider { width:1px; height:16px; background:rgba(255,255,255,0.08); margin:0 4px; }
   .journal-delete-btn { margin-top:40px; background:none; border:1px solid rgba(255,255,255,0.06); color:#4a4540; padding:6px 14px; font-size:11px; cursor:pointer; border-radius:2px; font-family:Georgia,serif; transition:all 0.2s; letter-spacing:0.08em; }
   .journal-delete-btn:hover { border-color:rgba(200,80,80,0.4); color:#c07070; }
   .journal-link-row { display:flex; align-items:center; gap:12px; margin-top:28px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.06); }
