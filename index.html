@@ -477,12 +477,40 @@ window.jfmtBlock = (tag) => {
 };
 
 window.jHighlight = () => {
-  const colors = ['#c4952a33', '#5a806033', '#6888c033', 'transparent'];
-  const sel = window.getSelection();
-  if (!sel.rangeCount) return;
-  // cycle through highlight colors
   document.execCommand('hiliteColor', false, '#c4952a33');
   document.getElementById("journalBody")?.focus();
+};
+
+window.setupJournalPaste = () => {
+  const body = document.getElementById("journalBody");
+  if (!body) return;
+  body.addEventListener("paste", (e) => {
+    e.preventDefault();
+    // Get plain text or clean HTML
+    const html = e.clipboardData.getData("text/html");
+    const text = e.clipboardData.getData("text/plain");
+    if (html) {
+      // Parse and strip all inline styles/backgrounds, keep structure
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, "text/html");
+      function cleanNode(node) {
+        if (node.nodeType === 1) {
+          node.removeAttribute("style");
+          node.removeAttribute("class");
+          node.removeAttribute("color");
+          node.removeAttribute("bgcolor");
+          Array.from(node.childNodes).forEach(cleanNode);
+        }
+      }
+      cleanNode(doc.body);
+      document.execCommand("insertHTML", false, doc.body.innerHTML);
+    } else {
+      // Plain text fallback — preserve line breaks
+      const escaped = text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\n/g,"<br>");
+      document.execCommand("insertHTML", false, escaped);
+    }
+    window.updateJournalBody(body.innerHTML);
+  });
 };
 
 window.updateJournalLinkTitle = (val) => {
@@ -568,6 +596,7 @@ function renderJournalEditor() {
       <button class="journal-delete-btn" onclick="window.deleteJournalEntry('${journalCurrentId}')">Delete entry</button>
     </div>
   `;
+  setTimeout(window.setupJournalPaste, 0);
 }
 window.switchTab = (tab) => {
   document.getElementById("osTab").style.display         = tab === "os"         ? "" : "none";
@@ -989,6 +1018,7 @@ function refreshDot(wk) {
   .journal-body-input { width:100%; background:none; border:none; color:#b0a898; padding:0; font-size:15px; font-family:Georgia,serif; outline:none; resize:none; line-height:1.85; min-height:400px; }
   .journal-body-input::placeholder { color:#3a3530; }
   .journal-body-rich { min-height:400px; color:#b0a898; font-size:15px; font-family:Georgia,serif; line-height:1.85; outline:none; padding:4px 0; }
+  .journal-body-rich * { background-color:transparent !important; color:inherit; }
   .journal-body-rich:empty:before { content:attr(data-placeholder); color:#3a3530; pointer-events:none; }
   .journal-body-rich b, .journal-body-rich strong { color:#e8e4dc; }
   .journal-body-rich i, .journal-body-rich em { color:#c8b898; }
