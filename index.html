@@ -413,16 +413,18 @@ function saveJournal() {
 function newJournalEntry() {
   const id = Date.now().toString();
   const now = new Date();
+  const dateStr = now.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric", year:"numeric" });
   journal[id] = {
     id,
     title: "",
-    date: now.toLocaleDateString("en-US", { weekday:"long", month:"long", day:"numeric", year:"numeric" }),
+    date: dateStr,
+    createdAt: now.toISOString(),
+    lastEditedAt: now.toISOString(),
     body: ""
   };
   journalCurrentId = id;
   saveJournal();
   renderJournal();
-  // Focus the title after render
   setTimeout(() => {
     const t = document.getElementById("journalTitle");
     if (t) t.focus();
@@ -457,8 +459,8 @@ window.deleteJournalEntry = deleteJournalEntry;
 window.updateJournalTitle = (val) => {
   if (!journalCurrentId || !journal[journalCurrentId]) return;
   journal[journalCurrentId].title = val;
+  journal[journalCurrentId].lastEditedAt = new Date().toISOString();
   saveJournal();
-  // Update list item title live
   const el = document.querySelector(`#jlist-${journalCurrentId} .jlist-title`);
   if (el) el.textContent = val || "Untitled";
 };
@@ -466,7 +468,11 @@ window.updateJournalTitle = (val) => {
 window.updateJournalBody = (val) => {
   if (!journalCurrentId || !journal[journalCurrentId]) return;
   journal[journalCurrentId].body = val;
+  journal[journalCurrentId].lastEditedAt = new Date().toISOString();
   saveJournal();
+  // Update last edited display live
+  const el = document.getElementById("journalLastEdited");
+  if (el) el.textContent = "Last edited: just now";
 };
 
 window.jfmt = (cmd) => {
@@ -616,6 +622,12 @@ function renderJournalList() {
   }).join("");
 }
 
+function formatDateShort(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric", hour:"2-digit", minute:"2-digit" });
+}
+
 function renderJournalEditor() {
   const editor = document.getElementById("journalEditor");
   if (!editor) return;
@@ -625,11 +637,14 @@ function renderJournalEditor() {
   }
   const e = journal[journalCurrentId];
   editor.innerHTML = `
-    <div class="journal-editor-inner">
-      <div class="journal-date-label">${esc(e.date)}</div>
+    <div class="journal-sticky-header">
       <input id="journalTitle" class="journal-title-input" type="text"
         value="${esc(e.title)}" placeholder="Entry title…"
         oninput="window.updateJournalTitle(this.value)" />
+      <div class="journal-dates">
+        <span>Created: ${e.createdAt ? formatDateShort(e.createdAt) : esc(e.date)}</span>
+        <span id="journalLastEdited">${e.lastEditedAt ? "Last edited: " + formatDateShort(e.lastEditedAt) : ""}</span>
+      </div>
       <div class="journal-toolbar">
         <button class="jtool-btn" onclick="window.jfmt('bold')" title="Bold"><b>B</b></button>
         <button class="jtool-btn" onclick="window.jfmt('italic')" title="Italic"><i>I</i></button>
@@ -647,6 +662,8 @@ function renderJournalEditor() {
         <button class="jtool-btn" onclick="window.uploadJournalImage()" title="Insert image">⊞ Image</button>
         <span id="journalImgStatus" style="display:none;font-size:11px;color:#c4952a;margin-left:6px;"></span>
       </div>
+    </div>
+    <div class="journal-editor-inner">
       <div id="journalBody" class="journal-body-rich" contenteditable="true"
         data-placeholder="Write freely…"
         oninput="window.updateJournalBody(this.innerHTML)">${e.body || ''}</div>
@@ -1076,7 +1093,9 @@ function refreshDot(wk) {
   .journal-editor::-webkit-scrollbar { width:4px; }
   .journal-editor::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:2px; }
   .journal-empty-state { text-align:center; color:#3a3530; font-size:22px; padding-top:80px; line-height:2; }
-  .journal-editor-inner { max-width:640px; margin:0 auto; padding:40px 40px 80px; }
+  .journal-sticky-header { position:sticky; top:0; z-index:10; background:#0e0e0f; border-bottom:1px solid rgba(255,255,255,0.07); padding:16px 40px 0; }
+  .journal-dates { display:flex; gap:16px; font-size:10px; color:#4a4540; letter-spacing:0.1em; margin:6px 0 0; padding-bottom:10px; flex-wrap:wrap; }
+  .journal-editor-inner { padding:24px 40px 80px; }
   .journal-date-label { font-size:10px; letter-spacing:0.2em; text-transform:uppercase; color:#5a5248; margin-bottom:16px; }
   .journal-title-input { width:100%; background:none; border:none; border-bottom:1px solid rgba(255,255,255,0.08); color:#e8e4dc; padding:8px 0; font-size:22px; font-family:Georgia,serif; outline:none; margin-bottom:24px; letter-spacing:-0.01em; transition:border-color 0.2s; }
   .journal-title-input:focus { border-bottom-color:rgba(196,149,42,0.4); }
@@ -1190,7 +1209,8 @@ function refreshDot(wk) {
     .journal-layout { flex-direction:column; height:auto; }
     .journal-sidebar { width:100%; border-right:none; border-bottom:1px solid rgba(255,255,255,0.07); }
     .journal-list { max-height:180px; }
-    .journal-editor-inner { padding:20px 14px 60px; }
+    .journal-editor-inner { padding:16px 16px 60px; }
+    .journal-sticky-header { padding:12px 16px 0; }
     .journal-title-input { font-size:18px; }
     .journal-body-input { font-size:14px; min-height:300px; }
 
