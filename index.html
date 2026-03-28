@@ -680,7 +680,17 @@ function renderJournalEditor() {
       <button class="journal-delete-btn" onclick="window.deleteJournalEntry('${journalCurrentId}')">Delete entry</button>
     </div>
   `;
-  setTimeout(window.setupJournalPaste, 0);
+  setTimeout(() => {
+    window.setupJournalPaste();
+    // Make toolbar sticky via scroll listener
+    const editorEl = document.getElementById("journalEditor");
+    const stickyEl = editorEl?.querySelector(".journal-sticky-header");
+    if (editorEl && stickyEl) {
+      editorEl.addEventListener("scroll", () => {
+        stickyEl.style.boxShadow = editorEl.scrollTop > 10 ? "0 2px 12px rgba(0,0,0,0.4)" : "none";
+      });
+    }
+  }, 0);
 }
 window.switchTab = (tab) => {
   document.getElementById("osTab").style.display         = tab === "os"         ? "" : "none";
@@ -1075,7 +1085,7 @@ function refreshDot(wk) {
   .link-delete-btn:hover { color:#c07070; }
 
   /* ── JOURNAL ── */
-  .journal-layout { display:flex; height:calc(100vh - 88px); overflow:hidden; }
+  .journal-layout { display:flex; height:calc(100vh - 48px); overflow:hidden; }
   .journal-sidebar { width:200px; flex-shrink:0; border-right:1px solid rgba(255,255,255,0.07); display:flex; flex-direction:column; overflow:hidden; }
   .journal-new-btn { margin:14px 14px 10px; background:none; border:1px dashed rgba(196,149,42,0.3); color:#8a7050; padding:8px 12px; font-size:11px; letter-spacing:0.12em; cursor:pointer; border-radius:2px; font-family:Georgia,serif; transition:all 0.2s; text-align:center; flex-shrink:0; }
   .journal-new-btn:hover { border-color:#c4952a; color:#c4952a; }
