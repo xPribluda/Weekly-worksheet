@@ -515,6 +515,29 @@ window.uploadJournalImage = async () => {
 window.setupJournalPaste = () => {
   const body = document.getElementById("journalBody");
   if (!body) return;
+
+  // Image click — select and show delete button
+  body.addEventListener("click", (e) => {
+    if (e.target.tagName === "IMG") {
+      // Remove any existing selection UI
+      document.querySelectorAll(".img-selected").forEach(el => el.classList.remove("img-selected"));
+      document.querySelectorAll(".img-delete-btn").forEach(el => el.remove());
+      e.target.classList.add("img-selected");
+      // Create delete button
+      const btn = document.createElement("button");
+      btn.className = "img-delete-btn";
+      btn.textContent = "✕ Remove image";
+      btn.onclick = () => {
+        e.target.remove();
+        btn.remove();
+        window.updateJournalBody(body.innerHTML);
+      };
+      e.target.insertAdjacentElement("afterend", btn);
+    } else {
+      document.querySelectorAll(".img-selected").forEach(el => el.classList.remove("img-selected"));
+      document.querySelectorAll(".img-delete-btn").forEach(el => el.remove());
+    }
+  });
   body.addEventListener("paste", async (e) => {
     // Check for image in clipboard
     const items = Array.from(e.clipboardData.items || []);
@@ -1063,7 +1086,10 @@ function refreshDot(wk) {
   .journal-body-rich { min-height:400px; color:#b0a898; font-size:15px; font-family:Georgia,serif; line-height:1.85; outline:none; padding:4px 0; }
   .journal-body-rich * { background-color:transparent !important; background:transparent !important; }
   .journal-body-rich:empty:before { content:attr(data-placeholder); color:#3a3530; pointer-events:none; }
-  .journal-body-rich b, .journal-body-rich strong { color:#e8e4dc; }
+  .journal-body-rich img { max-width:100%; border-radius:4px; margin:8px 0; display:block; cursor:pointer; }
+  .journal-body-rich img.img-selected { outline:2px solid #c4952a; border-radius:4px; }
+  .img-delete-btn { display:block; background:rgba(200,80,80,0.15); border:1px solid rgba(200,80,80,0.3); color:#c07070; padding:4px 12px; font-size:11px; cursor:pointer; border-radius:2px; font-family:Georgia,serif; margin:4px 0 12px; transition:all 0.2s; }
+  .img-delete-btn:hover { background:rgba(200,80,80,0.25); color:#e08080; }
   .journal-body-rich i, .journal-body-rich em { color:#c8b898; }
   .journal-body-rich u { text-decoration-color:rgba(196,149,42,0.5); }
   .journal-body-rich h2 { font-size:18px; color:#e8e4dc; font-weight:400; letter-spacing:-0.01em; margin:16px 0 8px; }
