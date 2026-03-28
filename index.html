@@ -11,6 +11,8 @@ import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc, onSnapshot }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD6-uAPDdvxhd4RtxGahIcq6BeKlXGhaZk",
@@ -24,6 +26,7 @@ const firebaseConfig = {
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
+const storage = getStorage(app);
 
 // ── State ──────────────────────────────────────────────
 const SECTIONS = [
@@ -481,12 +484,63 @@ window.jHighlight = () => {
   document.getElementById("journalBody")?.focus();
 };
 
+window.uploadJournalImage = async () => {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file || !currentUid) return;
+    const statusEl = document.getElementById("journalImgStatus");
+    if (statusEl) { statusEl.textContent = "Uploading…"; statusEl.style.display = "inline"; }
+    try {
+      const path = `users/${currentUid}/journal/${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      const body = document.getElementById("journalBody");
+      if (body) {
+        document.execCommand("insertHTML", false, `<img src="${url}" style="max-width:100%;border-radius:4px;margin:8px 0;" />`);
+        window.updateJournalBody(body.innerHTML);
+      }
+      if (statusEl) statusEl.style.display = "none";
+    } catch(e) {
+      if (statusEl) { statusEl.textContent = "Upload failed"; }
+      console.error(e);
+    }
+  };
+  input.click();
+};
+
 window.setupJournalPaste = () => {
   const body = document.getElementById("journalBody");
   if (!body) return;
-  body.addEventListener("paste", (e) => {
+  body.addEventListener("paste", async (e) => {
+    // Check for image in clipboard
+    const items = Array.from(e.clipboardData.items || []);
+    const imageItem = items.find(item => item.type.startsWith("image/"));
+    if (imageItem) {
+      e.preventDefault();
+      const file = imageItem.getAsFile();
+      if (!file || !currentUid) return;
+      const statusEl = document.getElementById("journalImgStatus");
+      if (statusEl) { statusEl.textContent = "Uploading…"; statusEl.style.display = "inline"; }
+      try {
+        const path = `users/${currentUid}/journal/${Date.now()}_pasted.png`;
+        const storageRef = ref(storage, path);
+        await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(storageRef);
+        document.execCommand("insertHTML", false, `<img src="${url}" style="max-width:100%;border-radius:4px;margin:8px 0;" />`);
+        window.updateJournalBody(body.innerHTML);
+        if (statusEl) statusEl.style.display = "none";
+      } catch(err) {
+        console.error(err);
+        if (statusEl) statusEl.textContent = "Upload failed";
+      }
+      return;
+    }
+    // Text paste — strip styles
     e.preventDefault();
-    // Always paste as plain text to avoid color/style bleed from external sources
     const text = e.clipboardData.getData("text/plain");
     const escaped = text
       .replace(/&/g,"&amp;")
@@ -566,6 +620,9 @@ function renderJournalEditor() {
         <div class="jtool-divider"></div>
         <button class="jtool-btn jtool-highlight" onclick="window.jHighlight()" title="Highlight">▲</button>
         <button class="jtool-btn" onclick="window.jfmt('removeFormat')" title="Clear formatting">✕</button>
+        <div class="jtool-divider"></div>
+        <button class="jtool-btn" onclick="window.uploadJournalImage()" title="Insert image">⊞ Image</button>
+        <span id="journalImgStatus" style="display:none;font-size:11px;color:#c4952a;margin-left:6px;"></span>
       </div>
       <div id="journalBody" class="journal-body-rich" contenteditable="true"
         data-placeholder="Write freely…"
