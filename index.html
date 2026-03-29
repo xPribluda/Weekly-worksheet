@@ -974,9 +974,13 @@ function refreshDot(wk) {
   .week-item.future-week.active .week-item-sub { color:#6878a0; }
 
   /* ── MAIN ── */
-  .main { flex:1; overflow-y:auto; position:relative; z-index:1; }
+  .main { flex:1; overflow:hidden; display:flex; flex-direction:column; position:relative; z-index:1; }
   .main::-webkit-scrollbar { width:4px; }
   .main::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:2px; }
+  #worksheetTab, #osTab, #linksTab, #remindersTab { overflow-y:auto; flex:1; }
+  #worksheetTab::-webkit-scrollbar, #osTab::-webkit-scrollbar, #linksTab::-webkit-scrollbar, #remindersTab::-webkit-scrollbar { width:4px; }
+  #worksheetTab::-webkit-scrollbar-thumb, #osTab::-webkit-scrollbar-thumb, #linksTab::-webkit-scrollbar-thumb, #remindersTab::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:2px; }
+  #journalTab { display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden; }
   .main-inner { max-width:680px; margin:0 auto; padding:48px 40px 80px; }
   .future-banner { background:rgba(68,88,160,0.12); border:1px solid rgba(100,130,200,0.15); border-radius:2px; padding:10px 16px; margin-bottom:28px; font-size:12px; color:#7080a8; display:flex; align-items:center; gap:8px; }
   .future-banner.hidden { display:none; }
@@ -1060,7 +1064,7 @@ function refreshDot(wk) {
   .link-delete-btn:hover { color:#c07070; }
 
   /* ── JOURNAL ── */
-  .journal-layout { display:flex; height:calc(100vh - 48px); overflow:hidden; }
+  .journal-layout { display:flex; overflow:hidden; flex:1; min-height:0; }
   .journal-right { display:flex; flex-direction:column; flex:1; overflow:hidden; min-height:0; }
   .journal-toolbar-fixed { display:flex; align-items:center; gap:2px; padding:8px 16px; border-bottom:1px solid rgba(255,255,255,0.07); background:#0e0e0f; flex-shrink:0; flex-wrap:wrap; }
   .journal-sidebar { width:200px; flex-shrink:0; border-right:1px solid rgba(255,255,255,0.07); display:flex; flex-direction:column; overflow:hidden; }
