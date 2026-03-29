@@ -506,7 +506,7 @@ window.uploadJournalImage = async () => {
       const url = await getDownloadURL(storageRef);
       const body = document.getElementById("journalBody");
       if (body) {
-        document.execCommand("insertHTML", false, `<img src="${url}" style="max-width:100%;border-radius:4px;margin:8px 0;" />`);
+        document.execCommand("insertHTML", false, `<img src="${url}" style="max-width:480px;width:100%;border-radius:4px;margin:8px 0;" />`);
         window.updateJournalBody(body.innerHTML);
       }
       if (statusEl) statusEl.style.display = "none";
@@ -559,7 +559,7 @@ window.setupJournalPaste = () => {
         const storageRef = ref(storage, path);
         await uploadBytes(storageRef, file);
         const url = await getDownloadURL(storageRef);
-        document.execCommand("insertHTML", false, `<img src="${url}" style="max-width:100%;border-radius:4px;margin:8px 0;" />`);
+        document.execCommand("insertHTML", false, `<img src="${url}" style="max-width:480px;width:100%;border-radius:4px;margin:8px 0;" />`);
         window.updateJournalBody(body.innerHTML);
         if (statusEl) statusEl.style.display = "none";
       } catch(err) {
@@ -633,29 +633,12 @@ function renderJournalEditor() {
   if (!editor) return;
   if (!journalCurrentId || !journal[journalCurrentId]) {
     editor.innerHTML = `<div class="journal-empty-state">◎<br><br>Select an entry or create a new one</div>`;
+    const toolbar = document.getElementById("journalToolbar");
+    if (toolbar) toolbar.style.display = "none";
     return;
   }
   const e = journal[journalCurrentId];
   editor.innerHTML = `
-    <div class="journal-sticky-header">
-      <div class="journal-toolbar">
-        <button class="jtool-btn" onclick="window.jfmt('bold')" title="Bold"><b>B</b></button>
-        <button class="jtool-btn" onclick="window.jfmt('italic')" title="Italic"><i>I</i></button>
-        <button class="jtool-btn" onclick="window.jfmt('underline')" title="Underline"><u>U</u></button>
-        <div class="jtool-divider"></div>
-        <button class="jtool-btn" onclick="window.jfmt('insertUnorderedList')" title="Bullet list">≡</button>
-        <button class="jtool-btn" onclick="window.jfmt('insertOrderedList')" title="Numbered list">1.</button>
-        <div class="jtool-divider"></div>
-        <button class="jtool-btn" onclick="window.jfmtBlock('h2')" title="Heading">H</button>
-        <button class="jtool-btn" onclick="window.jfmtBlock('blockquote')" title="Quote">"</button>
-        <div class="jtool-divider"></div>
-        <button class="jtool-btn jtool-highlight" onclick="window.jHighlight()" title="Highlight">▲</button>
-        <button class="jtool-btn" onclick="window.jfmt('removeFormat')" title="Clear formatting">✕</button>
-        <div class="jtool-divider"></div>
-        <button class="jtool-btn" onclick="window.uploadJournalImage()" title="Insert image">⊞ Image</button>
-        <span id="journalImgStatus" style="display:none;font-size:11px;color:#c4952a;margin-left:6px;"></span>
-      </div>
-    </div>
     <div class="journal-editor-inner">
       <div class="journal-date-label">${esc(e.date)}</div>
       <input id="journalTitle" class="journal-title-input" type="text"
@@ -680,17 +663,9 @@ function renderJournalEditor() {
       <button class="journal-delete-btn" onclick="window.deleteJournalEntry('${journalCurrentId}')">Delete entry</button>
     </div>
   `;
-  setTimeout(() => {
-    window.setupJournalPaste();
-    // Make toolbar sticky via scroll listener
-    const editorEl = document.getElementById("journalEditor");
-    const stickyEl = editorEl?.querySelector(".journal-sticky-header");
-    if (editorEl && stickyEl) {
-      editorEl.addEventListener("scroll", () => {
-        stickyEl.style.boxShadow = editorEl.scrollTop > 10 ? "0 2px 12px rgba(0,0,0,0.4)" : "none";
-      });
-    }
-  }, 0);
+  const toolbar = document.getElementById("journalToolbar");
+  if (toolbar) toolbar.style.display = "flex";
+  setTimeout(window.setupJournalPaste, 0);
 }
 window.switchTab = (tab) => {
   document.getElementById("osTab").style.display         = tab === "os"         ? "" : "none";
@@ -1086,6 +1061,8 @@ function refreshDot(wk) {
 
   /* ── JOURNAL ── */
   .journal-layout { display:flex; height:calc(100vh - 48px); overflow:hidden; }
+  .journal-right { display:flex; flex-direction:column; flex:1; overflow:hidden; }
+  .journal-toolbar-fixed { display:flex; align-items:center; gap:2px; padding:8px 16px; border-bottom:1px solid rgba(255,255,255,0.07); background:#0e0e0f; flex-shrink:0; flex-wrap:wrap; }
   .journal-sidebar { width:200px; flex-shrink:0; border-right:1px solid rgba(255,255,255,0.07); display:flex; flex-direction:column; overflow:hidden; }
   .journal-new-btn { margin:14px 14px 10px; background:none; border:1px dashed rgba(196,149,42,0.3); color:#8a7050; padding:8px 12px; font-size:11px; letter-spacing:0.12em; cursor:pointer; border-radius:2px; font-family:Georgia,serif; transition:all 0.2s; text-align:center; flex-shrink:0; }
   .journal-new-btn:hover { border-color:#c4952a; color:#c4952a; }
@@ -1116,7 +1093,7 @@ function refreshDot(wk) {
   .journal-body-rich { min-height:400px; color:#b0a898; font-size:15px; font-family:Georgia,serif; line-height:1.85; outline:none; padding:4px 0; }
   .journal-body-rich * { background-color:transparent !important; background:transparent !important; }
   .journal-body-rich:empty:before { content:attr(data-placeholder); color:#3a3530; pointer-events:none; }
-  .journal-body-rich img { max-width:100%; border-radius:4px; margin:8px 0; display:block; cursor:pointer; }
+  .journal-body-rich img { max-width:480px; width:100%; border-radius:4px; margin:8px 0; display:block; cursor:pointer; }
   .journal-body-rich img.img-selected { outline:2px solid #c4952a; border-radius:4px; }
   .img-delete-btn { display:block; background:rgba(200,80,80,0.15); border:1px solid rgba(200,80,80,0.3); color:#c07070; padding:4px 12px; font-size:11px; cursor:pointer; border-radius:2px; font-family:Georgia,serif; margin:4px 0 12px; transition:all 0.2s; }
   .img-delete-btn:hover { background:rgba(200,80,80,0.25); color:#e08080; }
@@ -1435,9 +1412,30 @@ function refreshDot(wk) {
             <button class="journal-new-btn" onclick="window.newJournalEntry()">+ New Entry</button>
             <div class="journal-list" id="journalList"></div>
           </div>
-          <div class="journal-editor" id="journalEditor">
-            <div class="journal-empty-state">◎<br><br>Select an entry or create a new one</div>
+          <div class="journal-right">
+            <div class="journal-toolbar-fixed" id="journalToolbar" style="display:none">
+              <button class="jtool-btn" onclick="window.jfmt('bold')" title="Bold"><b>B</b></button>
+              <button class="jtool-btn" onclick="window.jfmt('italic')" title="Italic"><i>I</i></button>
+              <button class="jtool-btn" onclick="window.jfmt('underline')" title="Underline"><u>U</u></button>
+              <div class="jtool-divider"></div>
+              <button class="jtool-btn" onclick="window.jfmt('insertUnorderedList')" title="Bullet list">≡</button>
+              <button class="jtool-btn" onclick="window.jfmt('insertOrderedList')" title="Numbered list">1.</button>
+              <div class="jtool-divider"></div>
+              <button class="jtool-btn" onclick="window.jfmtBlock('h2')" title="Heading">H</button>
+              <button class="jtool-btn" onclick="window.jfmtBlock('blockquote')" title="Quote">"</button>
+              <div class="jtool-divider"></div>
+              <button class="jtool-btn jtool-highlight" onclick="window.jHighlight()" title="Highlight">▲</button>
+              <button class="jtool-btn" onclick="window.jfmt('removeFormat')" title="Clear formatting">✕</button>
+              <div class="jtool-divider"></div>
+              <button class="jtool-btn" onclick="window.uploadJournalImage()" title="Insert image">⊞ Image</button>
+              <span id="journalImgStatus" style="display:none;font-size:11px;color:#c4952a;margin-left:6px;"></span>
+            </div>
+            <div class="journal-editor" id="journalEditor">
+              <div class="journal-empty-state">◎<br><br>Select an entry or create a new one</div>
+            </div>
           </div>
+        </div>
+      </div>
         </div>
       </div>
 
