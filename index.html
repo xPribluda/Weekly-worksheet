@@ -1061,7 +1061,7 @@ function refreshDot(wk) {
 
   /* ── JOURNAL ── */
   .journal-layout { display:flex; height:calc(100vh - 48px); overflow:hidden; }
-  .journal-right { display:flex; flex-direction:column; flex:1; overflow:hidden; }
+  .journal-right { display:flex; flex-direction:column; flex:1; overflow:hidden; min-height:0; }
   .journal-toolbar-fixed { display:flex; align-items:center; gap:2px; padding:8px 16px; border-bottom:1px solid rgba(255,255,255,0.07); background:#0e0e0f; flex-shrink:0; flex-wrap:wrap; }
   .journal-sidebar { width:200px; flex-shrink:0; border-right:1px solid rgba(255,255,255,0.07); display:flex; flex-direction:column; overflow:hidden; }
   .journal-new-btn { margin:14px 14px 10px; background:none; border:1px dashed rgba(196,149,42,0.3); color:#8a7050; padding:8px 12px; font-size:11px; letter-spacing:0.12em; cursor:pointer; border-radius:2px; font-family:Georgia,serif; transition:all 0.2s; text-align:center; flex-shrink:0; }
@@ -1077,13 +1077,13 @@ function refreshDot(wk) {
   .jlist-date { font-size:10px; color:#4a4540; }
   .jlist-item.active .jlist-date { color:#6a5a40; }
   .jlist-empty { padding:20px 14px; font-size:12px; color:#4a4540; }
-  .journal-editor { flex:1; overflow-y:auto; position:relative; }
+  .journal-editor { flex:1; overflow-y:auto; min-height:0; position:relative; }
   .journal-editor::-webkit-scrollbar { width:4px; }
   .journal-editor::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.08); border-radius:2px; }
   .journal-empty-state { text-align:center; color:#3a3530; font-size:22px; padding-top:80px; line-height:2; }
   .journal-sticky-header { position:sticky; top:0; z-index:10; background:#0e0e0f; border-bottom:1px solid rgba(255,255,255,0.07); padding:8px 40px; }
   .journal-dates { display:flex; gap:16px; font-size:10px; color:#4a4540; letter-spacing:0.1em; margin-top:4px; flex-wrap:wrap; }
-  .journal-editor-inner { padding:24px 40px 80px; }
+  .journal-editor-inner { max-width:640px; margin:0 auto; padding:32px 40px 80px; }
   .journal-date-label { font-size:10px; letter-spacing:0.2em; text-transform:uppercase; color:#5a5248; margin-bottom:16px; }
   .journal-title-input { width:100%; background:none; border:none; border-bottom:1px solid rgba(255,255,255,0.08); color:#e8e4dc; padding:8px 0; font-size:22px; font-family:Georgia,serif; outline:none; margin-bottom:24px; letter-spacing:-0.01em; transition:border-color 0.2s; }
   .journal-title-input:focus { border-bottom-color:rgba(196,149,42,0.4); }
