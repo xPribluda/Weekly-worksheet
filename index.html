@@ -1065,8 +1065,7 @@ function refreshDot(wk) {
 
   /* ── JOURNAL ── */
   .journal-layout { display:flex; overflow:hidden; flex:1; min-height:0; }
-  .journal-right { display:flex; flex-direction:column; flex:1; overflow:hidden; min-height:0; }
-  .journal-toolbar-fixed { position:sticky; top:0; ... }.  .journal-new-btn { margin:14px 14px 10px; background:none; border:1px dashed rgba(196,149,42,0.3); color:#8a7050; padding:8px 12px; font-size:11px; letter-spacing:0.12em; cursor:pointer; border-radius:2px; font-family:Georgia,serif; transition:all 0.2s; text-align:center; flex-shrink:0; }
+  .journal-right { display:flex; flex-direction:column; flex:1; overflow-y:auto; overflow-x:hidden; min-height:0; }  .journal-toolbar-fixed { position:sticky; top:0; ... }.  .journal-new-btn { margin:14px 14px 10px; background:none; border:1px dashed rgba(196,149,42,0.3); color:#8a7050; padding:8px 12px; font-size:11px; letter-spacing:0.12em; cursor:pointer; border-radius:2px; font-family:Georgia,serif; transition:all 0.2s; text-align:center; flex-shrink:0; }
   .journal-new-btn:hover { border-color:#c4952a; color:#c4952a; }
   .journal-list { flex:1; overflow-y:auto; padding:4px 0 24px; }
   .journal-list::-webkit-scrollbar { width:3px; }
