@@ -670,7 +670,7 @@ function renderJournalEditor() {
 window.switchTab = (tab) => {
   document.getElementById("osTab").style.display         = tab === "os"         ? "" : "none";
   document.getElementById("worksheetTab").style.display  = tab === "worksheet"  ? "" : "none";
-  document.getElementById("journalTab").style.display    = tab === "journal"    ? "" : "none";
+  document.getElementById("journalTab").style.display    = tab === "journal"    ? "flex" : "none";
   document.getElementById("linksTab").style.display      = tab === "links"      ? "" : "none";
   document.getElementById("remindersTab").style.display  = tab === "reminders"  ? "" : "none";
   document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
