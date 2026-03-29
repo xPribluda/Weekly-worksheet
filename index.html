@@ -1175,6 +1175,8 @@ function refreshDot(wk) {
 
     /* Main content full width */
     .main { overflow: visible; }
+    /* Journal needs fixed height even on mobile for sticky toolbar */
+    #journalTab { height: calc(100vh - 100px); flex:1; }
     .main-inner { padding: 18px 14px 48px; }
     .future-banner { font-size: 11px; padding: 8px 12px; margin-bottom: 16px; }
     .week-heading { margin-bottom: 8px; }
@@ -1198,9 +1200,10 @@ function refreshDot(wk) {
     .remove-btn { font-size: 18px; padding: 0 6px; }
 
     /* Journal mobile */
-    .journal-layout { flex-direction:column; height:auto; }
-    .journal-sidebar { width:100%; border-right:none; border-bottom:1px solid rgba(255,255,255,0.07); }
-    .journal-list { max-height:180px; }
+    .journal-layout { flex-direction:column; }
+    .journal-sidebar { width:100%; border-right:none; border-bottom:1px solid rgba(255,255,255,0.07); flex-shrink:0; }
+    .journal-list { max-height:150px; }
+    .journal-right { min-height:0; flex:1; }
     .journal-editor-inner { padding:16px 16px 60px; }
     .journal-sticky-header { padding:12px 16px 0; }
     .journal-title-input { font-size:18px; }
