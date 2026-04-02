@@ -158,9 +158,22 @@ function showAffirmationBanner() {
   const el = document.getElementById("affirmationBanner");
   if (!el) return;
   if (!sentences.length) { el.style.display = "none"; return; }
-  const text = sentences[Math.floor(Math.random() * sentences.length)];
-  el.textContent = "✦ " + text;
+
+  let index = Math.floor(Math.random() * sentences.length);
+
+  function showNext() {
+    el.style.opacity = "0";
+    setTimeout(() => {
+      el.textContent = "✦ " + sentences[index];
+      el.style.opacity = "1";
+      index = (index + 1) % sentences.length;
+    }, 400);
+  }
+
+  el.style.transition = "opacity 0.4s ease";
   el.style.display = "block";
+  showNext();
+  setInterval(showNext, 30000);
 }
 function setStatus(state) {
   const el = document.getElementById("syncStatus");
